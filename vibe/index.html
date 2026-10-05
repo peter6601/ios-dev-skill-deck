@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一句話上車，試用卡下車 — iOS Vibe</title>
+<meta name="description" content="iOS Vibe 使用指南簡報：不寫 code，也能做出自己的 iPhone app。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   THEME TOKENS — 改顏色、字體從這裡改
+   路線色 l1–l7 對應七種情境，整份簡報固定不變
+   =========================================== */
+:root{
+  --stage-bg:#d9d4c7; --slide-bg:#F3EFE4;
+  --ink:#1B1B1B; --ink2:#3b3a36; --muted:#77736a; --card:#FFFDF7; --river:#DCE7EA; --rule:rgba(27,27,27,.14);
+  --cream:#EDE8DC;
+  --l1:#D2232A; --l2:#E89A00; --l3:#0070BD; --l4:#00964B; --l5:#8B4A9C; --l6:#A0662C; --l7:#00A0A8;
+  --latin:'Overpass','Noto Sans TC',sans-serif;
+  --cjk:'Noto Sans TC','Overpass',sans-serif;
+  --mono:'Overpass Mono','Noto Sans TC',monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ===========================================
+   FIXED 16:9 STAGE — viewport-base.css（完整收錄）
+   =========================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+img,video,canvas,svg{max-width:100%;max-height:100%}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
+  .deck-viewport{position:static;overflow:visible;background:#fff}
+  .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none}
+  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .deck-controls{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
+
+/* ===========================================
+   SLIDE BASE — 米色紙＋點陣網格，像一張路網圖
+   =========================================== */
+.slide{color:var(--ink);font-family:var(--cjk);--acc:var(--sec);
+  background-image:radial-gradient(rgba(27,27,27,.085) 1.5px,transparent 1.6px);background-size:40px 40px;
+  transition:opacity .45s ease,visibility 0s linear .45s}
+.slide.active{transition:opacity .45s ease,visibility 0s}
+.abs{position:absolute}
+.hl{color:var(--acc)}
+.red{color:var(--l1)} .amber{color:var(--l2)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+
+/* === HEADER（每頁頂端的站牌列） === */
+.hdr{position:absolute;left:110px;right:110px;top:52px;display:flex;justify-content:space-between;align-items:center;
+  font:700 20px/1 var(--mono);letter-spacing:.06em;color:var(--muted)}
+.hdr .sec{display:flex;align-items:center;gap:12px;color:var(--ink2)}
+.hdr .sec i{width:30px;height:12px;border-radius:6px;background:var(--sec);display:block}
+
+/* === TYPE === */
+.kicker{position:absolute;left:110px;font:700 26px/1 var(--mono);letter-spacing:.08em;color:var(--acc)}
+.title{position:absolute;left:110px;top:150px;font:900 88px/1.18 var(--cjk);letter-spacing:.01em}
+.big{position:absolute;left:104px;font:900 140px/1.14 var(--cjk);letter-spacing:.01em}
+.lead{position:absolute;left:110px;font:500 36px/1.6 var(--cjk);color:var(--ink2)}
+.sub{position:absolute;left:110px;font:500 32px/1.5 var(--cjk);color:var(--muted)}
+.foot{position:absolute;left:110px;font:500 28px/1.5 var(--cjk);color:var(--muted)}
+.lead b,.sub b,.foot b{color:var(--ink);font-weight:700}
+
+/* === BADGES === */
+.badge{display:inline-block;width:46px;height:46px;border-radius:10px;color:#fff;font:900 28px/48px var(--latin);text-align:center;flex:none}
+.tag{display:inline-block;padding:6px 14px;border-radius:999px;font:700 20px/1 var(--mono);letter-spacing:.06em;border:3px solid currentColor}
+
+/* === CARDS（月台牌） === */
+.card{position:absolute;background:var(--card);border:5px solid var(--ink);border-radius:28px;padding:30px 40px}
+.card .ct{font:900 40px/1.2 var(--cjk)}
+.card .ct small{font:500 26px/1 var(--cjk);color:var(--muted);margin-left:14px}
+.card p{font:500 30px/1.55 var(--cjk);color:var(--ink2);margin-top:12px}
+.term-card{position:absolute;background:var(--ink);color:var(--cream);border-radius:28px;padding:34px 44px;font:500 26px/1.7 var(--mono)}
+.term-card .k{color:#9c978b}
+.term-card .c{color:#7d796f}
+
+/* === SVG MAP PRIMITIVES === */
+svg.map{position:absolute;left:0;top:0;width:1920px;height:1080px;max-width:none;max-height:none;overflow:visible;pointer-events:none}
+.ln{fill:none;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1 1;stroke-dashoffset:1}
+.slide.visible .ln{stroke-dashoffset:0;transition:stroke-dashoffset 1.4s var(--ease) var(--d,.3s)}
+.stn{fill:#fff;stroke:var(--ink);stroke-width:6}
+.term{fill:#fff;stroke-width:8}
+.hub{fill:#fff;stroke:var(--ink);stroke-width:9}
+.river{fill:none;stroke:var(--river);stroke-width:120;stroke-linecap:round}
+.t-lab{font:700 28px var(--cjk);fill:var(--ink)}
+.t-sm{font:500 24px var(--cjk);fill:var(--muted)}
+.t-mono{font:700 24px var(--mono);fill:var(--muted);letter-spacing:.04em}
+.t-num{font:900 44px var(--latin);fill:var(--ink)}
+
+/* === REVEAL ANIMATIONS（換頁時依序出現） === */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .8s var(--ease) var(--d,0s),transform .8s var(--ease) var(--d,0s)}
+.slide.visible .reveal{opacity:1;transform:none}
+.pop{opacity:0;transform:scale(.6);transform-box:fill-box;transform-origin:center;transition:opacity .6s var(--ease) var(--d,.2s),transform .6s var(--ease) var(--d,.2s)}
+.slide.visible .pop{opacity:1;transform:none}
+
+/* === SECTION SIGN（章節站牌） === */
+.sign-band{position:absolute;left:0;right:0;top:300px;height:380px;background:var(--ink);border-bottom:22px solid var(--sec);
+  display:flex;align-items:center;gap:56px;padding-left:150px}
+.sign-num{width:180px;height:180px;border-radius:50%;background:var(--sec);color:#fff;font:900 110px/184px var(--latin);text-align:center;flex:none}
+.sign-name{color:#fff;font:900 136px/1.1 var(--cjk);letter-spacing:.02em}
+.sign-en{color:#b9b4a8;font:800 36px/1 var(--latin);letter-spacing:.14em;margin-top:22px}
+.sign-top{position:absolute;left:150px;top:220px;font:700 26px/1 var(--mono);letter-spacing:.1em;color:var(--muted)}
+
+/* ===========================================
+   INLINE EDITING — 左上角 hover 或按 E 進入編輯
+   =========================================== */
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer}
+.edit-toggle{position:fixed;top:16px;left:16px;z-index:10001;opacity:0;pointer-events:none;transition:opacity .3s ease;
+  border:3px solid var(--ink);background:var(--card);border-radius:999px;padding:8px 16px;font:700 14px/1 var(--mono);cursor:pointer}
+.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto}
+.edit-toggle.active{background:var(--l2);color:#fff;border-color:var(--l2)}
+body.editing [contenteditable="true"]{outline:2px dashed rgba(0,112,189,.55);outline-offset:4px;cursor:text}
+.toast{position:fixed;right:20px;bottom:20px;z-index:10002;background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font:700 14px/1 var(--mono);opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.progress{position:fixed;left:0;bottom:0;height:4px;background:var(--ink);z-index:999;transition:width .4s var(--ease)}
+
+/* ===========================================
+   VIBE ADDITIONS — 可複製的指令卡、平台切換、底部路線進度
+   =========================================== */
+.prompt{position:absolute;background:var(--ink);color:var(--cream);border-radius:24px;padding:20px 30px 26px}
+.prompt .bar{display:flex;align-items:center;gap:14px;font:700 18px/1 var(--mono);color:#8a867d;margin-bottom:16px;letter-spacing:.04em}
+.prompt .bar .sp{flex:1}
+.prompt pre{margin:0;font:500 22px/1.65 var(--mono);white-space:pre-wrap;word-break:break-word;color:var(--cream)}
+.cmd{color:#ffcf6e;font-weight:700}
+.copy{font:700 18px/1 var(--mono);color:var(--l2);background:transparent;border:2px solid var(--l2);border-radius:999px;padding:9px 18px;cursor:pointer;letter-spacing:.04em}
+.copy:hover{background:rgba(232,154,0,.15)}
+.copy.done{background:var(--l2);color:var(--ink)}
+.seg{display:inline-flex;border:2px solid #4a4741;border-radius:999px;overflow:hidden}
+.seg button{font:700 16px/1 var(--mono);color:#9c978b;background:transparent;border:0;padding:8px 14px;cursor:pointer}
+.seg button.on{background:var(--cream);color:var(--ink)}
+.t{position:absolute;font:500 30px/1.55 var(--cjk);color:var(--ink2)}
+.t b{color:var(--ink);font-weight:800}
+.h{font:900 38px/1.25 var(--cjk);color:var(--ink)}
+.small{font:500 24px/1.5 var(--cjk);color:var(--muted)}
+.li{display:flex;gap:16px;margin-top:16px}
+.li .dot{flex:none;width:14px;height:14px;border-radius:50%;margin-top:.55em;background:var(--acc)}
+.call{position:absolute;border-left:8px solid var(--acc);padding:6px 0 6px 24px;font:600 28px/1.55 var(--cjk);color:var(--ink)}
+.chip{display:inline-block;padding:8px 16px;border-radius:999px;border:3px solid currentColor;font:800 24px/1 var(--cjk);margin:0 10px 12px 0}
+.card .ct{font:900 36px/1.25 var(--cjk)}
+.card p{font:500 27px/1.55 var(--cjk)}
+.num{display:inline-block;width:46px;height:46px;border-radius:50%;color:#fff;font:900 26px/48px var(--latin);text-align:center;flex:none}
+.card .num{font:900 26px/48px var(--latin);color:#fff;margin:0}
+</style>
+</head>
+<body>
+<div class="edit-hotzone" aria-hidden="true"></div>
+<button class="edit-toggle" id="editToggle" title="編輯模式 (E)">編輯 (E)</button>
+<div class="toast" id="toast" role="status"></div>
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage" aria-label="iOS Vibe 簡報">
+<section class="slide" style="--sec:var(--ink);--acc:var(--l4)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<h1 class="abs reveal" style="left:104px;top:140px;font:900 100px/1.16 var(--cjk);--d:.05s">不寫 code，<br>也能做出自己的 <span style="color:var(--l4)">iPhone app</span>。</h1>
+<p class="t reveal" style="left:110px;top:400px;width:1560px;font-size:32px;--d:.15s">iOS Vibe 使用指南：你用白話說想做什麼，AI 負責規劃、寫程式、測試與檢查；<br>做好可以試的一段，就給你一張<b style="color:var(--l2)">試用卡</b>。</p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.3s;stroke-width:14px" d="M180 760 H1760"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:0.3s" cx="180" cy="760" r="20"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:5px;--d:0.7s" cx="480" cy="760" r="10"/><text x="480" y="725" text-anchor="middle" style="font:500 24px var(--cjk);fill:var(--muted)">規劃</text><circle class="stn pop" style="stroke:var(--l4);stroke-width:5px;--d:0.7799999999999999s" cx="680" cy="760" r="10"/><text x="680" y="725" text-anchor="middle" style="font:500 24px var(--cjk);fill:var(--muted)">寫程式</text><circle class="stn pop" style="stroke:var(--l4);stroke-width:5px;--d:0.86s" cx="880" cy="760" r="10"/><text x="880" y="725" text-anchor="middle" style="font:500 24px var(--cjk);fill:var(--muted)">測試</text><circle class="stn pop" style="stroke:var(--l4);stroke-width:5px;--d:0.94s" cx="1080" cy="760" r="10"/><text x="1080" y="725" text-anchor="middle" style="font:500 24px var(--cjk);fill:var(--muted)">審查</text><g class="pop" style="--d:1.1s"><rect x="1290" y="722" width="150" height="76" rx="38" fill="#fff" stroke="var(--l2)" stroke-width="11"/></g><text x="1365" y="850" text-anchor="middle" style="font:900 34px var(--cjk);fill:var(--l2)">試用卡</text><text x="1365" y="884" text-anchor="middle" style="font:500 22px var(--cjk);fill:var(--muted)">你在這站下車試用</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.2s" cx="1560" cy="760" r="14"/><text x="1560" y="725" text-anchor="middle" style="font:800 24px var(--cjk);fill:var(--ink)">回 OK</text><circle class="term pop" style="stroke:var(--l4);--d:1.3s" cx="1760" cy="760" r="22"/><text x="1760" y="830" text-anchor="middle" style="font:800 30px var(--cjk);fill:var(--ink)">下一段</text><path class="pop" style="--d:1.4s" d="M1330 800 C 1250 935, 760 935, 680 778" fill="none" stroke="var(--l2)" stroke-width="6" stroke-dasharray="14 12" stroke-linecap="round"/><text x="1005" y="955" text-anchor="middle" style="font:700 24px var(--cjk);fill:var(--l2)">不對？描述你看到的，回去再修</text><text x="180" y="830" text-anchor="middle" style="font:800 30px var(--cjk);fill:var(--ink)">一句話上車</text><text x="180" y="864" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">/ios-vibe</text></svg>
+<p class="abs reveal mono muted" style="left:110px;top:1000px;font-size:20px;font-weight:700;letter-spacing:.04em;--d:.5s">github.com/peter6601/ios-dev-skill · VIBE.md</p>
+
+</section>
+<section class="slide" style="--sec:var(--ink);--acc:var(--l4)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+<p class="kicker reveal" style="top:102px">分工</p><h2 class="title reveal" style="top:150px;font-size:68px;--d:.05s">你負責想法、選擇與試用；<br>AI 負責工程工作，並留下紀錄。</h2><div class="card reveal" style="left:110px;top:350px;width:820px;height:380px;padding:28px 36px;background:var(--card);border-left:20px solid var(--l2);--d:0.2s"><p class="ct" style="color:var(--l2);font-size:40px">你</p><div class="li" style="margin-top:26px;font-size:32px"><span class="dot" style="background:var(--l2)"></span><span><b>想法</b>：要做什麼、給誰用</span></div><div class="li" style="margin-top:26px;font-size:32px"><span class="dot" style="background:var(--l2)"></span><span><b>選擇</b>：AI 問產品問題，你挑答案</span></div><div class="li" style="margin-top:26px;font-size:32px"><span class="dot" style="background:var(--l2)"></span><span><b>試用</b>：照試用卡操作，回 OK 或描述問題</span></div></div><div class="card reveal" style="left:990px;top:350px;width:820px;height:380px;padding:28px 36px;background:var(--card);border-left:20px solid var(--l4);--d:0.3s"><p class="ct" style="color:var(--l4);font-size:40px">AI</p><div class="li" style="margin-top:18px;font-size:32px"><span class="dot" style="background:var(--l4)"></span><span><b>規劃</b>與技術選擇</span></div><div class="li" style="margin-top:18px;font-size:32px"><span class="dot" style="background:var(--l4)"></span><span><b>寫程式</b>、自動測試</span></div><div class="li" style="margin-top:18px;font-size:32px"><span class="dot" style="background:var(--l4)"></span><span><b>審查</b>與修正</span></div><div class="li" style="margin-top:18px;font-size:32px"><span class="dot" style="background:var(--l4)"></span><span>技術決策<b>記在專案裡</b>，方便之後交接</span></div></div><div class="t reveal" style="left:110px;top:800px;width:1700px;font-size:30px;--d:0.4s;"><b>適合先做：</b>自己用、資料留在這支手機的小工具</div><div class="abs reveal" style="left:110px;top:858px;--d:.5s"><span class="chip" style="color:var(--l4)">離線閱讀清單</span><span class="chip" style="color:var(--l4)">桌遊收藏清單</span><span class="chip" style="color:var(--l4)">旅行打包清單</span><span class="chip" style="color:var(--muted);border-style:dashed">不支援：登入、付款、跨裝置同步、敏感個資、上架</span></div>
+
+</section>
+<section class="slide" style="--sec:var(--ink);--acc:var(--l4)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">整趟旅程長這樣</h2><div class="t reveal" style="left:110px;top:255px;width:1700px;font-size:30px;--d:0.1s;"><b style="color:var(--l2)">黃圈</b>是你要做的事，其餘由 AI 處理。</div><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.3s;stroke-width:12px" d="M150 430 H1660 L1760 530 V660 L1660 760 H700"/><circle class="pop" style="--d:.3s" cx="150" cy="430" r="12" fill="var(--ink)"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:0.6s" cx="250" cy="430" r="24"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.7s" cx="700" cy="430" r="18"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:0.8s" cx="1150" cy="430" r="24"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.9s" cx="1600" cy="430" r="18"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.0s" cx="1600" cy="760" r="18"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:1.1s" cx="1150" cy="760" r="24"/><circle class="term pop" style="stroke:var(--l4);--d:1.5s" cx="700" cy="760" r="24"/><path class="pop" style="--d:1.6s" d="M1150 735 C 1150 600, 1600 600, 1600 455" fill="none" stroke="var(--l2)" stroke-width="6" stroke-dasharray="14 12" stroke-linecap="round"/><text x="1480" y="655" text-anchor="middle" style="font:700 24px var(--cjk);fill:var(--l2)">不符合期待</text><text x="1480" y="687" text-anchor="middle" style="font:700 24px var(--cjk);fill:var(--l2)">描述問題 → 回去修</text></svg><div class="abs reveal" style="left:50px;top:316px;width:400px;text-align:center;--d:0.70s"><p style="font:900 34px/1.3 var(--cjk);color:var(--l2)">你說明想做什麼</p><p class="small" style="margin-top:4px">一句話就能開始</p></div><div class="abs reveal" style="left:500px;top:316px;width:400px;text-align:center;--d:0.80s"><p style="font:900 34px/1.3 var(--cjk);color:var(--ink)">AI 問產品問題</p><p class="small" style="margin-top:4px">提出第一版範圍</p></div><div class="abs reveal" style="left:950px;top:316px;width:400px;text-align:center;--d:0.90s"><p style="font:900 34px/1.3 var(--cjk);color:var(--l2)">你確認要做的功能</p><p class="small" style="margin-top:4px">第一版最多三個畫面</p></div><div class="abs reveal" style="left:1400px;top:316px;width:400px;text-align:center;--d:1.00s"><p style="font:900 34px/1.3 var(--cjk);color:var(--ink)">AI 規劃、製作</p><p class="small" style="margin-top:4px">測試與檢查都在這段</p></div><div class="abs reveal" style="left:1400px;top:804px;width:400px;text-align:center;--d:1.10s"><p style="font:900 34px/1.3 var(--cjk);color:var(--ink)">交付試用卡</p><p class="small" style="margin-top:4px">最多五步，照做就好</p></div><div class="abs reveal" style="left:950px;top:804px;width:400px;text-align:center;--d:1.20s"><p style="font:900 34px/1.3 var(--cjk);color:var(--l2)">你試用</p><p class="small" style="margin-top:4px">手機或模擬器</p></div><div class="abs reveal" style="left:500px;top:804px;width:400px;text-align:center;--d:1.30s"><p style="font:900 34px/1.3 var(--cjk);color:var(--ink)">回 OK，保留這一版</p><p class="small" style="margin-top:4px">接續下一步</p></div><div class="t reveal" style="left:110px;top:930px;width:1000px;font-size:26px;--d:1.6s;color:var(--muted)">你不必自己拆工作清單；回覆試用卡後，AI 依已確認的範圍接著做。</div>
+
+</section>
+<section class="slide" style="--sec:var(--l3);--acc:var(--l3)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>上車前</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">上車前，準備這五樣</h2><div class="card reveal" style="left:110px;top:290px;width:324px;height:400px;padding:28px 36px;background:var(--card);--d:0.15s"><p class="num" style="background:var(--l3)">1</p><p class="ct" style="margin-top:18px;font-size:30px">一台 Mac</p><p style="font-size:23px;margin-top:10px;color:var(--ink2)">製作、測試與安裝 iPhone app</p></div><div class="card reveal" style="left:454px;top:290px;width:324px;height:400px;padding:28px 36px;background:var(--card);--d:0.22s"><p class="num" style="background:var(--l3)">2</p><p class="ct" style="margin-top:18px;font-size:30px">Xcode</p><p style="font-size:23px;margin-top:10px;color:var(--ink2)">從 Mac App Store 安裝，開一次完成初始設定</p></div><div class="card reveal" style="left:798px;top:290px;width:324px;height:400px;padding:28px 36px;background:var(--card);--d:0.29000000000000004s"><p class="num" style="background:var(--l3)">3</p><p class="ct" style="margin-top:18px;font-size:30px">Claude 或 Codex<br>開發環境</p><p style="font-size:23px;margin-top:10px;color:var(--ink2)">能操作本機專案，例如 Claude Code、Codex 桌面 app；不只是一般聊天</p></div><div class="card reveal" style="left:1142px;top:290px;width:324px;height:400px;padding:28px 36px;background:var(--card);--d:0.36s"><p class="num" style="background:var(--l3)">4</p><p class="ct" style="margin-top:18px;font-size:30px">AI 工具的帳號</p><p style="font-size:23px;margin-top:10px;color:var(--ink2)">讓 AI 執行開發工作；用量依你的方案計算</p></div><div class="card reveal" style="left:1486px;top:290px;width:324px;height:400px;padding:28px 36px;background:var(--card);border-style:dashed;--d:0.43000000000000005s"><p class="num" style="background:var(--l3)">5</p><p class="ct" style="margin-top:18px;font-size:30px">iPhone＋<br>Apple 帳號</p><p style="font-size:23px;margin-top:10px;color:var(--ink2)">選用。想裝到手機時才需要，也可以先用模擬器</p></div><div class="call reveal" style="left:110px;top:735px;width:820px;--acc:var(--l3);--d:.6s"><b>模擬器</b>是在 Mac 上跑的虛擬 iPhone。沒有實機也能看畫面、點按鈕；相機、震動、實際手感仍要真機確認。</div><div class="call reveal" style="left:990px;top:735px;width:820px;--acc:var(--l2);--d:.7s"><b>app 不連網 ≠ AI 不連網。</b>限制的是做出來的 app；安裝工具與使用 AI 服務仍需要網路和帳號。</div><div class="t reveal" style="left:110px;top:945px;width:1700px;font-size:26px;--d:0.8s;color:var(--muted)">Git、Node.js、Python 這些名字不用先研究，請 AI 檢查並帶你補齊。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="11" fill="#fff" stroke="var(--l3)" stroke-width="6"/><text x="130" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l3)">上車前</text><circle cx="535" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l3);--acc:var(--l3)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>上車前</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">安裝：把這段話貼給 AI</h2><div class="prompt reveal" style="left:110px;top:280px;width:1140px;--d:0.15s"><div class="bar"><span>貼給 AI</span><span class="sp"></span><button class="copy">複製</button></div><pre style="font-size:20px">請幫我安裝 iOS vibe 開發工具：
+
+1. 先檢查這台 Mac 的 Xcode、Git、Node.js／npx、Python 與 AI 開發環境是否可用。
+   缺少什麼就用白話說明，帶我補齊。
+2. 把 https://github.com/peter6601/ios-dev-skill 下載到 ~/Developer/ios-dev-skill。
+   如果已存在，先確認是不是同一個專案、有沒有尚未保存的修改，再處理更新。
+3. 在該資料夾執行 ./install.sh --vibe --dry-run。
+   告訴我會安裝哪些工具、修改哪些設定，以及會影響 Claude、Codex 還是兩者。
+4. 等我確認後，再執行 ./install.sh --vibe --yes。
+5. 完成後執行 ./install.sh --vibe --check，逐項說明是否可用。
+   如果有失敗、缺件或跳過的項目，帶我處理，不要只說「安裝完成」。</pre></div><div class="abs reveal" style="left:1300px;top:290px;width:510px;border-left:8px solid var(--l3);padding-left:24px;--d:0.30s"><p class="h" style="font-size:34px">AI 先列計畫</p><p class="t" style="position:static;font-size:26px;margin-top:8px">你確認之後，才真的安裝。</p></div><div class="abs reveal" style="left:1300px;top:500px;width:510px;border-left:8px solid var(--l2);padding-left:24px;--d:0.40s"><p class="h" style="font-size:34px">路徑只是範例</p><p class="t" style="position:static;font-size:26px;margin-top:8px"><span class="mono" style="font-size:22px;color:var(--ink)">~/Developer/ios-dev-skill</span> 可以換；之後更新、解除安裝都用同一個位置。</p></div><div class="abs reveal" style="left:1300px;top:710px;width:510px;border-left:8px solid var(--l7);padding-left:24px;--d:0.50s"><p class="h" style="font-size:34px">兩個平台都有？</p><p class="t" style="position:static;font-size:26px;margin-top:8px">可能兩邊都設定。只想裝一邊，先說「只幫我設定 Codex」。</p></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="11" fill="#fff" stroke="var(--l3)" stroke-width="6"/><text x="130" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l3)">上車前</text><circle cx="535" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l3);--acc:var(--l3)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>上車前</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">裝完之後：重新開啟，再確認</h2><div class="card reveal" style="left:110px;top:290px;width:540px;height:560px;padding:28px 36px;background:var(--card);--d:0.15s"><p class="ct" style="font-size:32px">安裝會做這四件事</p><div class="li" style="margin-top:18px;font-size:26px"><span class="dot" style="background:var(--l3)"></span><span>安裝工作指引與審查助手，補齊相依工具</span></div><div class="li" style="margin-top:18px;font-size:26px"><span class="dot" style="background:var(--l3)"></span><span>設定模擬器工具，協助看畫面與操作</span></div><div class="li" style="margin-top:18px;font-size:26px"><span class="dot" style="background:var(--l3)"></span><span>全域指引加入「iOS 需求預設用 vibe」</span></div><div class="li" style="margin-top:18px;font-size:26px"><span class="dot" style="background:var(--l3)"></span><span>Codex：加入 <b>careful-ios</b> 操作保護</span></div></div><div class="card reveal" style="left:690px;top:290px;width:540px;height:560px;padding:28px 36px;background:var(--card);--d:0.25s"><p class="ct" style="font-size:32px">重新開啟</p><p style="margin-top:22px;font-size:26px"><b style="color:var(--ink)">Claude</b><br>重新開啟工作階段 → <span class="mono" style="color:var(--l4);font-weight:700">/ios-vibe</span></p><p style="margin-top:22px;font-size:26px"><b style="color:var(--ink)">Codex</b><br>重新開啟 → 輸入 <span class="mono" style="font-weight:700">/hooks</span>，把 careful-ios 設為信任 → <span class="mono" style="color:var(--l4);font-weight:700">$ios-vibe</span></p><p class="small" style="margin-top:22px">找不到 /hooks？告訴 AI 你看到什麼，不要當成已經啟用。</p></div><div class="card reveal" style="left:1270px;top:290px;width:540px;height:560px;padding:28px 36px;background:var(--card);--d:0.35s"><p class="ct" style="font-size:32px">怎麼確認真的裝好</p><div class="li" style="margin-top:14px;font-size:26px"><span class="dot" style="background:var(--l4)"></span><span>Xcode 與 Python 可以執行</span></div><div class="li" style="margin-top:14px;font-size:26px"><span class="dot" style="background:var(--l4)"></span><span>必要的 skill、plugin 沒有缺件</span></div><div class="li" style="margin-top:14px;font-size:26px"><span class="dot" style="background:var(--l4)"></span><span>平台認得 ios-vibe</span></div><div class="li" style="margin-top:14px;font-size:26px"><span class="dot" style="background:var(--l4)"></span><span>模擬器工具不能用時，有說明替代方式</span></div><div class="li" style="margin-top:14px;font-size:26px"><span class="dot" style="background:var(--l4)"></span><span>Codex 的保護設定已經信任</span></div><p class="small" style="margin-top:18px;color:var(--l1);font-weight:700">檢查指令正常結束，不代表全部通過。</p></div><div class="t reveal" style="left:110px;top:900px;width:1700px;font-size:26px;--d:0.5s;"><b>請保留 ios-dev-skill 資料夾。</b>它和你之後做的 app 專案是兩份不同的東西；接續開發時要開的是 app 專案。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="11" fill="#fff" stroke="var(--l3)" stroke-width="6"/><text x="130" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l3)">上車前</text><circle cx="535" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l4);--acc:var(--l4)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>出發</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">第一句話：描述你的第一個 app</h2><div class="t reveal" style="left:110px;top:265px;width:1100px;font-size:30px;--d:0.1s;">先選一件想解決的小事，第一版只做核心操作。</div><div class="prompt reveal" style="left:110px;top:340px;width:1080px;--d:0.2s"><div class="bar"><span>貼給 AI · 第一句話</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span> 我想做一個離線閱讀清單 app。
+可以手動加入書名、標記已讀，關掉再打開時清單還在。
+先只給我自己使用，不需要登入或同步。
+請告訴我 app 專案會存在哪個資料夾。</pre></div><div class="t reveal" style="left:110px;top:640px;width:1080px;font-size:24px;--d:0.3s;color:var(--muted)">右上角可以切換 Claude／Codex，複製的指令會跟著變。</div><div class="t reveal" style="left:1290px;top:280px;width:520px;font-size:30px;--d:0.3s;"><b>至少說清楚這三件事</b></div><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.4s;stroke-width:10px" d="M1330 400 V780"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:8px;--d:0.6s" cx="1330" cy="400" r="22"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:8px;--d:0.7s" cx="1330" cy="590" r="22"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:8px;--d:0.8s" cx="1330" cy="780" r="22"/></svg><div class="abs reveal" style="left:1380px;top:372px;width:430px;--d:0.70s"><p class="h" style="font-size:34px">給誰用</p><p class="small">例如只有我自己</p></div><div class="abs reveal" style="left:1380px;top:562px;width:430px;--d:0.80s"><p class="h" style="font-size:34px">最常做的一件事</p><p class="small">例如新增與勾選項目</p></div><div class="abs reveal" style="left:1380px;top:752px;width:430px;--d:0.90s"><p class="h" style="font-size:34px">希望看到的結果</p><p class="small">關掉再打開，資料還在</p></div><div class="t reveal" style="left:1290px;top:880px;width:520px;font-size:24px;--d:1.0s;color:var(--muted)">畫面可以用文字描述，也可以附參考截圖。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="11" fill="#fff" stroke="var(--l4)" stroke-width="6"/><text x="555" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l4)">出發</text><circle cx="960" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l4);--acc:var(--l4)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>出發</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">想描述得更完整，用這個範本</h2><div class="prompt reveal" style="left:110px;top:290px;width:1080px;--d:0.15s"><div class="bar"><span>貼給 AI · 範本</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span>
+我想做：&lt;一句話說明&gt;
+給誰用：&lt;例如只有我自己&gt;
+最重要的操作：&lt;例如新增與勾選項目&gt;
+第一個畫面：&lt;希望一打開看到什麼&gt;
+資料要不要保留：&lt;關掉 app 再打開後，哪些內容應該還在&gt;
+第一版先不做：&lt;暫時不需要的功能&gt;
+參考：&lt;喜歡的畫面或操作方式&gt;</pre></div><div class="card reveal" style="left:1250px;top:290px;width:560px;height:300px;padding:28px 36px;background:var(--card);--d:0.3s"><p class="ct" style="font-size:32px;color:var(--l2)">不知道怎麼填？</p><p style="margin-top:14px">直接寫「<b style="color:var(--ink)">請給我建議</b>」。</p><p class="small" style="margin-top:12px">不用為了開始，就把所有細節都想完。</p></div><div class="card reveal" style="left:1250px;top:630px;width:560px;height:250px;padding:28px 36px;background:var(--card);--d:0.4s"><p class="ct" style="font-size:32px">角括號要換掉</p><p style="margin-top:14px">把 <span class="mono">&lt;…&gt;</span> 換成你的內容，括號本身刪掉。</p></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="11" fill="#fff" stroke="var(--l4)" stroke-width="6"/><text x="555" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l4)">出發</text><circle cx="960" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l4);--acc:var(--l4)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>出發</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">過程中，你只參與兩件事</h2><div class="card reveal" style="left:110px;top:290px;width:540px;height:340px;padding:28px 36px;background:var(--card);--d:0.15s"><p class="num" style="background:var(--l2)">1</p><p class="ct" style="margin-top:16px;color:var(--l2)">產品選擇</p><p style="margin-top:12px">AI 會問給誰用、第一個畫面、資料要不要保留、刪除前要不要確認——用你懂的話，並附建議。</p></div><div class="card reveal" style="left:690px;top:290px;width:540px;height:340px;padding:28px 36px;background:var(--card);--d:0.25s"><p class="num" style="background:var(--l2)">2</p><p class="ct" style="margin-top:16px;color:var(--l2)">實際試用</p><p style="margin-top:12px">做出能操作的功能後，你確認「這是不是我要的」，以及手機上實際操作的感受。</p></div><div class="card reveal" style="left:1270px;top:290px;width:540px;height:340px;padding:28px 36px;background:#eef4ec;--d:0.35s"><p class="ct" style="color:var(--l4)">其他交給 AI</p><p style="margin-top:12px">規劃、技術選擇、寫程式、自動測試、審查與修正，依工作流執行；技術決策記在專案裡。</p></div><div class="t reveal" style="left:110px;top:690px;width:1700px;font-size:28px;--d:0.45s;">新 app 先確認<b>最多三個畫面</b>的初版範圍，再拆成幾步完成。AI 會告訴你總共幾步、哪幾步可以試用；<br>只整理內部結構的步驟，不會塞給你一張無法操作的卡。</div><div class="call reveal" style="left:110px;top:850px;width:1700px;--acc:var(--l1);--d:.55s">試用卡代表<b>這次驗證已通過</b>，不代表程式永遠不會出錯；每張卡都會寫明做過哪些檢查。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="11" fill="#fff" stroke="var(--l4)" stroke-width="6"/><text x="555" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l4)">出發</text><circle cx="960" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l2);--acc:var(--l2)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>試用卡</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:140px;font-size:72px;--d:.05s">試用卡長這樣</h2><span class="abs tag reveal muted" style="left:640px;top:162px;--d:.1s">格式示例</span><div class="card reveal" style="left:110px;top:250px;width:1080px;padding:30px 40px;background:var(--card);border-left:20px solid var(--l2);--d:0.15s"><p style="font:900 38px/1.25 var(--cjk);color:var(--ink)">試用卡：閱讀清單可以新增一本書了</p><div style="display:flex;gap:16px;margin-top:20px"><span class="num" style="background:var(--l2);width:38px;height:38px;font-size:22px;line-height:40px">1</span><div><p style="margin:0;font:800 24px/1.3 var(--cjk);color:var(--ink)">做了什麼</p><div style="font:500 24px/1.5 var(--cjk);color:var(--ink2);margin-top:4px">可以輸入書名，加入自己的閱讀清單。</div></div></div><div style="display:flex;gap:16px;margin-top:20px"><span class="num" style="background:var(--l2);width:38px;height:38px;font-size:22px;line-height:40px">2</span><div><p style="margin:0;font:800 24px/1.3 var(--cjk);color:var(--ink)">改前 → 改後</p><div style="font:500 24px/1.5 var(--cjk);color:var(--ink2);margin-top:4px">原本只有空白清單 → 現在可以新增並看到書名（實際交付會附截圖）。</div></div></div><div style="display:flex;gap:16px;margin-top:20px"><span class="num" style="background:var(--l2);width:38px;height:38px;font-size:22px;line-height:40px">3</span><div><p style="margin:0;font:800 24px/1.3 var(--cjk);color:var(--ink)">請你在 iPhone 上試（約 2 分鐘）</p><div style="font:500 24px/1.5 var(--cjk);color:var(--ink2);margin-top:4px"><div style="display:grid;grid-template-columns:1fr 1fr;column-gap:24px"><span>1. 打開 app，點「新增」。</span><span>2. 輸入「想讀的一本書」，點「儲存」。</span><span>3. 確認清單出現剛才的書名。</span><span>4. 完全關掉 app 再打開，確認書名仍在。</span></div></div></div></div><div style="display:flex;gap:16px;margin-top:20px"><span class="num" style="background:var(--l2);width:38px;height:38px;font-size:22px;line-height:40px">4</span><div><p style="margin:0;font:800 24px/1.3 var(--cjk);color:var(--ink)">最可能出問題的地方</p><div style="font:500 24px/1.5 var(--cjk);color:var(--ink2);margin-top:4px">沒填書名就按儲存，應看到說明，不應多出空白項目。</div></div></div><div style="display:flex;gap:16px;margin-top:20px"><span class="num" style="background:var(--l2);width:38px;height:38px;font-size:22px;line-height:40px">5</span><div><p style="margin:0;font:800 24px/1.3 var(--cjk);color:var(--ink)">這份改動的檢查狀況</p><div style="font:500 24px/1.5 var(--cjk);color:var(--ink2);margin-top:4px">沒有人類讀過這份程式碼。交付時會列出已完成的測試、AI 審查，以及有沒有另一個模型交叉檢查。</div></div></div><p style="font:800 26px/1.4 var(--cjk);color:var(--l2);margin-top:18px">試完請回「OK」。哪裡不對，直接描述你看到的。</p></div><div class="abs reveal" style="left:1250px;top:270px;width:560px;display:flex;gap:18px;--d:0.40s"><span class="num" style="background:var(--l2)">1</span><div><p class="h" style="font-size:32px">一張卡＝一次改動</p><p class="small" style="margin-top:6px">試用步驟最多五步。</p></div></div><div class="abs reveal" style="left:1250px;top:450px;width:560px;display:flex;gap:18px;--d:0.50s"><span class="num" style="background:var(--l2)">3</span><div><p class="h" style="font-size:32px">存資料就一定要重開</p><p class="small" style="margin-top:6px">「完全關掉再打開」是固定的一步。</p></div></div><div class="abs reveal" style="left:1250px;top:630px;width:560px;display:flex;gap:18px;--d:0.60s"><span class="num" style="background:var(--l2)">4</span><div><p class="h" style="font-size:32px">先講最可能壞在哪</p><p class="small" style="margin-top:6px">讓你試的時候知道要特別看哪裡。</p></div></div><div class="abs reveal" style="left:1250px;top:810px;width:560px;display:flex;gap:18px;--d:0.70s"><span class="num" style="background:var(--l2)">5</span><div><p class="h" style="font-size:32px">誰檢查過，照實寫</p><p class="small" style="margin-top:6px">不會暗示有人類工程師讀過程式碼。</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="11" fill="#fff" stroke="var(--l2)" stroke-width="6"/><text x="980" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l2)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l2);--acc:var(--l2)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>試用卡</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:76px;--d:.05s">回「OK」之前，先知道它代表什麼</h2><div class="card reveal" style="left:110px;top:280px;width:820px;height:560px;padding:28px 36px;background:var(--card);--d:0.15s"><p class="ct" style="color:var(--l4);font-size:38px">回 OK ＝ 接受這張卡描述的成果</p><p style="margin-top:14px">AI 會把它整理進目前採用的版本，再接續已確認的工作。</p><p class="ct" style="margin-top:30px;font-size:30px;color:var(--l1)">但不代表你授權</p><div style="margin-top:14px"><span class="chip" style="color:var(--l1)">上傳 GitHub</span><span class="chip" style="color:var(--l1)">公開發佈</span><span class="chip" style="color:var(--l1)">付款</span><span class="chip" style="color:var(--l1)">範圍外的新需求</span></div><p style="margin-top:14px">還沒試？就說「<b style="color:var(--ink)">我還沒試，先等一下</b>」。</p></div><div class="card reveal" style="left:990px;top:280px;width:820px;height:560px;padding:28px 36px;background:var(--card);--d:0.3s"><p class="ct" style="color:var(--l2);font-size:38px">不符合期待時，說這三件事</p><div style="display:flex;gap:12px;margin-top:18px"><span class="chip" style="color:var(--l2)">你做了什麼</span><span class="chip" style="color:var(--l2)">實際看到什麼</span><span class="chip" style="color:var(--l2)">原本希望怎樣</span></div><p class="small" style="margin-top:6px">不知道問題叫什麼沒關係，截圖或錄影也行。</p></div><div class="prompt reveal" style="left:1035px;top:560px;width:730px;--d:0.45s"><div class="bar"><span>例如</span><span class="sp"></span><button class="copy">複製</button></div><pre style="font-size:24px">我輸入書名後按儲存，清單沒有增加，也沒有錯誤訊息。
+我希望儲存成功後回到清單，看到剛才的書名。</pre></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="11" fill="#fff" stroke="var(--l2)" stroke-width="6"/><text x="980" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l2)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l2);--acc:var(--l2)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>試用卡</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">出卡前，AI 要先過這些檢查</h2><div class="card reveal" style="left:110px;top:290px;width:540px;height:500px;padding:28px 36px;background:var(--card);--d:0.15s"><p class="ct" style="font-size:32px">每次都要過</p><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>app 能成功建置</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>自動測試通過</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>主要操作已經測過</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>沒有超出 vibe 範圍的程式行為</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>完成規定的 AI 審查</span></div></div><div class="card reveal" style="left:690px;top:290px;width:540px;height:500px;padding:28px 36px;background:var(--card);--d:0.25s"><p class="ct" style="font-size:32px">依功能加查</p><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l3)"></span><span>關掉重開後，資料仍在</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l3)"></span><span>刪除只影響指定的項目</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l3)"></span><span>拒絕權限時不閃退</span></div><div class="li" style="margin-top:18px;font-size:27px"><span class="dot" style="background:var(--l3)"></span><span>連續操作不會產生重複或損壞的資料</span></div></div><div class="card reveal" style="left:1270px;top:290px;width:540px;height:500px;padding:28px 36px;background:var(--card);--d:0.35s"><p class="ct" style="font-size:32px">想再請另一個 AI 查？</p><div class="li" style="margin-top:14px;font-size:24px"><span class="dot" style="background:var(--l5)"></span><span>主要用 Claude、也登入了 Codex，可以加一次 Codex 唯讀審查</span></div><div class="li" style="margin-top:14px;font-size:24px"><span class="dot" style="background:var(--l5)"></span><span>會多花一些時間與用量</span></div><div class="li" style="margin-top:14px;font-size:24px"><span class="dot" style="background:var(--l5)"></span><span>資料保存、刪除、新權限等高風險改動，可能再問你要不要加強</span></div><div class="li" style="margin-top:14px;font-size:24px"><span class="dot" style="background:var(--l5)"></span><span>主要用 Codex 時，另開一個 Codex 不算「另一家模型交叉檢查」</span></div></div><div class="call reveal" style="left:110px;top:850px;width:1700px;--acc:var(--l1);--d:.5s">檢查沒過就不出卡。你做得到的試用，<b>不能代替</b> AI 本來就能跑的自動檢查。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="11" fill="#fff" stroke="var(--l2)" stroke-width="6"/><text x="980" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l2)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>日常</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">日常，就這四句話</h2><div class="t reveal" style="left:110px;top:258px;width:1700px;font-size:28px;--d:0.1s;">接續時，先在 AI 開發環境<b>開啟原本的 app 專案資料夾</b>。</div><div class="prompt reveal" style="left:110px;top:330px;width:830px;height:240px;--d:0.2s"><div class="bar"><span>加一個功能</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span> 閱讀清單想加「已讀」標記。
+我希望可以切換「全部」和「還沒讀」，原本的書名都要保留。</pre></div><div class="prompt reveal" style="left:980px;top:330px;width:830px;height:240px;--d:0.28s"><div class="bar"><span>調整畫面</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span> 清單的字有點小，請放大書名，讓每列更容易點。
+保留目前的新增與已讀操作方式。</pre></div><div class="prompt reveal" style="left:110px;top:600px;width:830px;height:240px;--d:0.36s"><div class="bar"><span>回報問題</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span> 我把書名改掉後，關掉再打開，卻又變回原本的名稱。
+每次都會發生。我是在自己的 iPhone 上試的。</pre></div><div class="prompt reveal" style="left:980px;top:600px;width:830px;height:240px;--d:0.44s"><div class="bar"><span>暫停後接著做</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span> 繼續這個 app。
+上次做到閱讀清單可以新增書名，最後一張試用卡我已經回 OK。
+請先看專案裡的紀錄，告訴我下一步原本要做什麼。</pre></div><div class="t reveal" style="left:110px;top:880px;width:1700px;font-size:26px;--d:0.6s;">不記得做到哪裡，就說「請先幫我確認進度」；<b>不要另外建一個同名 app。</b></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="11" fill="#fff" stroke="var(--l7)" stroke-width="6"/><text x="1405" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l7)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>日常</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">第一次裝到 iPhone</h2><div class="t reveal" style="left:110px;top:258px;width:1700px;font-size:28px;--d:0.1s;">沒有 iPhone 就先跳過，用模擬器試。要裝到手機時，AI 會一次帶你完成一個步驟。</div><div class="abs reveal" style="left:110px;top:330px;width:1020px;--d:.2s"><div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:5px solid var(--ink);border-radius:24px;overflow:hidden;background:var(--card)"><div style="padding:16px 26px;background:var(--l2);color:#fff;font:900 28px/1.3 var(--cjk)">你親自做</div><div style="padding:16px 26px;background:var(--ink);color:#fff;font:900 28px/1.3 var(--cjk)">AI 協助</div><div style="padding:18px 26px;border-top:3px solid var(--rule);font:700 26px/1.5 var(--cjk)">在 Xcode 登入自己的 Apple 帳號</div><div style="padding:18px 26px;border-top:3px solid var(--rule);font:500 26px/1.5 var(--cjk);color:var(--ink2)">告訴你在哪裡登入，確認設定完成</div><div style="padding:18px 26px;border-top:3px solid var(--rule);font:700 26px/1.5 var(--cjk)">接上 iPhone，信任電腦、開啟開發者模式</div><div style="padding:18px 26px;border-top:3px solid var(--rule);font:500 26px/1.5 var(--cjk);color:var(--ink2)">確認 Mac 找得到手機，排除連線問題</div><div style="padding:18px 26px;border-top:3px solid var(--rule);font:700 26px/1.5 var(--cjk)">手機要求時，信任這個開發者</div><div style="padding:18px 26px;border-top:3px solid var(--rule);font:500 26px/1.5 var(--cjk);color:var(--ink2)">告訴你在哪裡完成，再確認 app 能打開</div></div></div><div class="call reveal" style="left:110px;top:780px;width:1020px;--acc:var(--l1);--d:.35s">Apple 帳號密碼、驗證碼、手機密碼<b>都由你自己輸入</b>，不要貼進 AI 對話。</div><div class="card reveal" style="left:1190px;top:330px;width:620px;height:270px;padding:28px 36px;background:var(--card);--d:0.3s"><p class="ct" style="font-size:32px">免費帳號：7 天到期</p><p style="margin-top:12px;font-size:25px">用免費 Apple 帳號裝到手機，大約 7 天後要重新安裝；不是永久裝好。</p></div><div class="prompt reveal" style="left:1190px;top:640px;width:620px;--d:0.4s"><div class="bar"><span>打不開時</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:21px"><span class="cmd">/ios-vibe</span> 之前裝到 iPhone 的 app 現在打不開。
+請先確認是不是安裝期限到期，協助重新安裝，並保留原本資料。</pre></div><div class="t reveal" style="left:1190px;top:905px;width:620px;font-size:24px;--d:0.5s;">先請 AI 判斷，<b>不要自己刪 app</b>——可能連手機資料一起刪掉。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="11" fill="#fff" stroke="var(--l7)" stroke-width="6"/><text x="1405" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l7)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>日常</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">改壞了？說「回到上一版」</h2><div class="prompt reveal" style="left:110px;top:280px;width:1700px;--d:0.15s"><div class="bar"><span>貼給 AI</span><span class="sp"></span><span class="seg"><button data-p="claude">Claude</button><button data-p="codex">Codex</button></span><button class="copy">複製</button></div><pre style="font-size:24px"><span class="cmd">/ios-vibe</span> 回到上一版。請先告訴我會回到哪個版本，資料會不會受影響。</pre></div><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.3s;stroke-width:12px" d="M200 640 H1500"/><circle class="stn pop" style="stroke:var(--l7);stroke-width:7px;--d:0.6s" cx="300" cy="640" r="20"/><text x="300" y="604" text-anchor="middle" style="font:800 28px var(--cjk);fill:var(--ink)">已經可以新增書名</text><text x="300" y="566" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">存檔點 1</text><circle class="stn pop" style="stroke:var(--l7);stroke-width:7px;--d:0.72s" cx="760" cy="640" r="20"/><text x="760" y="604" text-anchor="middle" style="font:800 28px var(--cjk);fill:var(--ink)">加入已讀標記</text><text x="760" y="566" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">存檔點 2</text><circle class="stn pop" style="stroke:var(--l7);stroke-width:9px;--d:0.84s" cx="1220" cy="640" r="26"/><text x="1220" y="604" text-anchor="middle" style="font:800 28px var(--cjk);fill:var(--l7)">放大書名</text><text x="1220" y="566" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">目前</text><path class="pop" style="--d:1.1s" d="M1200 676 C 1150 790, 820 790, 778 676" fill="none" stroke="var(--l2)" stroke-width="6" stroke-dasharray="14 12" stroke-linecap="round"/><path class="pop" style="--d:1.1s" d="M792 700 L776 674 L806 682" fill="none" stroke="var(--l2)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><text x="990" y="805" text-anchor="middle" style="font:900 28px var(--cjk);fill:var(--l2)">回到上一版</text></svg><div class="t reveal" style="left:1560px;top:520px;width:260px;font-size:22px;--d:0.5s;color:var(--muted)">最新在右邊</div><div class="t reveal" style="left:110px;top:860px;width:1700px;font-size:27px;--d:0.6s;"><b>AI 會用白話列出近期的存檔點讓你選。</b>只說「上一版」就是上一個存檔點；不確定是哪個，先請它列出。<br>回復時會保留原本的工作歷史，再從選定版本接著做。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="11" fill="#fff" stroke="var(--l7)" stroke-width="6"/><text x="1405" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l7)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>日常</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:72px;--d:.05s">程式版本、手機資料、備份，是三件事</h2><div class="card reveal" style="left:110px;top:270px;width:1700px;height:230px;padding:28px 36px;background:var(--card);border-left:20px solid var(--l1);--d:0.15s"><p class="ct" style="font-size:34px;color:var(--l1)">回復程式，不一定能還原手機裡的資料</p><p style="margin-top:12px">如果途中改過資料格式，舊版可能要用升級前留下的資料備份；升級後新增或修改的內容可能不會出現。<b style="color:var(--ink)">AI 必須先說明影響、保存目前資料，等你確認才回復。</b></p></div><div class="card reveal" style="left:110px;top:550px;width:540px;height:260px;padding:28px 36px;background:var(--card);border-left:20px solid var(--l7);--d:0.3s"><p class="ct" style="font-size:32px;color:var(--l7)">App 的存檔點</p><p style="margin-top:12px">保留某個程式版本，方便回到之前的實作。</p></div><div class="card reveal" style="left:690px;top:550px;width:540px;height:260px;padding:28px 36px;background:var(--card);border-left:20px solid var(--l2);--d:0.4s"><p class="ct" style="font-size:32px;color:var(--l2)">資料升級備份</p><p style="margin-top:12px">支援的資料格式升級前，保留一份 app 資料副本。</p></div><div class="card reveal" style="left:1270px;top:550px;width:540px;height:260px;padding:28px 36px;background:var(--card);border-left:20px solid var(--l3);--d:0.5s"><p class="ct" style="font-size:32px;color:var(--l3)">遠端程式備份</p><p style="margin-top:12px">另外把專案上傳到指定位置，例如 GitHub。</p></div><div class="call reveal" style="left:110px;top:860px;width:1700px;--acc:var(--ink);--d:.6s">本機存檔不等於雲端備份；上傳程式也不等於備份手機資料。沒設定遠端時，程式版本只存在這台 Mac。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="11" fill="#fff" stroke="var(--l7)" stroke-width="6"/><text x="1405" y="1039" text-anchor="start" style="font:800 19px var(--cjk);fill:var(--l7)">日常</text><circle cx="1810" cy="1032" r="6" fill="#fff" stroke="var(--ink2)" stroke-width="3"/><text x="1790" y="1038" text-anchor="end" style="font:500 18px var(--cjk);fill:var(--muted)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>終點以外</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">這班車目前不開到這些地方</h2><div class="t reveal" style="left:110px;top:258px;width:1700px;font-size:30px;--d:0.1s;">範圍：<b>資料留在單機、不依賴連網、你能實際試用的小型 app。</b></div><div class="card reveal" style="left:110px;top:330px;width:540px;height:560px;padding:28px 36px;background:var(--card);--d:0.2s"><p class="ct" style="font-size:32px;color:var(--l4)">適合從這些開始</p><div class="li" style="margin-top:22px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>手動新增書名、標記已讀的<b>離線閱讀清單</b></span></div><div class="li" style="margin-top:22px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>手動輸入物品、逐項勾選的<b>打包清單</b></span></div><div class="li" style="margin-top:22px;font-size:27px"><span class="dot" style="background:var(--l4)"></span><span>記錄桌遊名稱與分類的<b>本機收藏清單</b></span></div><p class="small" style="margin-top:22px">都不含線上搜尋、共享帳號或跨裝置同步。</p></div><div class="abs reveal" style="left:690px;top:330px;width:1120px;--d:.3s"><div style="border:5px solid var(--ink);border-radius:24px;overflow:hidden;background:var(--card)"><div style="padding:14px 26px;background:var(--l5);color:#fff;font:900 28px/1.3 var(--cjk)">需要其他開發安排</div><div style="display:grid;grid-template-columns:330px 1fr;border-top:3px solid var(--rule)"><div style="padding:14px 26px;font:800 26px/1.45 var(--cjk)">帳號與登入</div><div style="padding:14px 26px;font:500 25px/1.45 var(--cjk);color:var(--ink2)">Apple／Google 登入、會員系統</div></div><div style="display:grid;grid-template-columns:330px 1fr;border-top:3px solid var(--rule)"><div style="padding:14px 26px;font:800 26px/1.45 var(--cjk)">付款與訂閱</div><div style="padding:14px 26px;font:500 25px/1.45 var(--cjk);color:var(--ink2)">付費解鎖、月費方案</div></div><div style="display:grid;grid-template-columns:330px 1fr;border-top:3px solid var(--rule)"><div style="padding:14px 26px;font:800 26px/1.45 var(--cjk)">連網與跨裝置資料</div><div style="padding:14px 26px;font:500 25px/1.45 var(--cjk);color:var(--ink2)">呼叫外部服務、跟家人共用、雲端備份、自動同步</div></div><div style="display:grid;grid-template-columns:330px 1fr;border-top:3px solid var(--rule)"><div style="padding:14px 26px;font:800 26px/1.45 var(--cjk)">敏感個資</div><div style="padding:14px 26px;font:500 25px/1.45 var(--cjk);color:var(--ink2)">健康、財務、精確位置、聯絡人，或上傳相簿</div></div><div style="display:grid;grid-template-columns:330px 1fr;border-top:3px solid var(--rule)"><div style="padding:14px 26px;font:800 26px/1.45 var(--cjk)">破壞性的資料格式修改</div><div style="padding:14px 26px;font:500 25px/1.45 var(--cjk);color:var(--ink2)">既有欄位改名、刪除、改型別</div></div><div style="display:grid;grid-template-columns:330px 1fr;border-top:3px solid var(--rule)"><div style="padding:14px 26px;font:800 26px/1.45 var(--cjk)">對外發佈</div><div style="padding:14px 26px;font:500 25px/1.45 var(--cjk);color:var(--ink2)">App Store 上架、TestFlight 測試</div></div></div></div><div class="t reveal" style="left:110px;top:930px;width:1700px;font-size:26px;--d:0.5s;">遇到這些需求，AI 會先說明限制：<b>縮成符合範圍的版本</b>，或<b>整理成果交給工程師</b>。單機版本也一樣要避開敏感個資。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="11" fill="#fff" stroke="var(--l5)" stroke-width="6"/><text x="1790" y="1039" text-anchor="end" style="font:800 19px var(--cjk);fill:var(--l5)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>終點以外</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">常見問題</h2><div class="card reveal" style="left:110px;top:280px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.1s"><p class="h" style="font-size:28px;color:var(--l5)">完全不懂程式，可以開始嗎？</p><p style="font-size:24px;margin-top:12px">可以。你仍要決定做什麼、試用成果，並自己完成帳號登入與手機設定。</p></div><div class="card reveal" style="left:540px;top:280px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.15000000000000002s"><p class="h" style="font-size:28px;color:var(--l5)">找不到 ios-vibe／安裝一直出錯？</p><p style="font-size:24px;margin-top:12px">重開工作階段、確認指令；把錯誤或「跳過」訊息貼給 AI。不要反覆刪資料夾重裝。</p></div><div class="card reveal" style="left:970px;top:280px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.2s"><p class="h" style="font-size:28px;color:var(--l5)">做很久還沒有試用卡？</p><p style="font-size:24px;margin-top:12px">可能在整理內部結構，或測試、審查還沒過。問它：「卡在哪一步？下一個能試的是什麼？」</p></div><div class="card reveal" style="left:1400px;top:280px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.25s"><p class="h" style="font-size:28px;color:var(--l5)">可以跳過檢查，先給我試嗎？</p><p style="font-size:24px;margin-top:12px">不行。想更快看到成果，就把這次的功能縮小。</p></div><div class="card reveal" style="left:110px;top:610px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.30000000000000004s"><p class="h" style="font-size:28px;color:var(--l5)">原本就有一個 app，也能用嗎？</p><p style="font-size:24px;margin-top:12px">可以先請 AI 檢查；不符合 vibe 規則的部分，需要工程師接手。</p></div><div class="card reveal" style="left:540px;top:610px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.35s"><p class="h" style="font-size:28px;color:var(--l5)">做好的 app 能給很多人用嗎？</p><p style="font-size:24px;margin-top:12px">試用卡不代表有工程師讀過程式碼，也不是上架保證。要對外提供，先交給工程師審閱。</p></div><div class="card reveal" style="left:970px;top:610px;width:410px;height:300px;padding:24px 28px;background:var(--card);--d:0.4s"><p class="h" style="font-size:28px;color:var(--l5)">需要付費的開發者帳號嗎？</p><p style="font-size:24px;margin-top:12px">只用模擬器不需要；裝到手機可用免費帳號，但有安裝期限。AI 工具費用另計。</p></div><div class="card reveal" style="left:1400px;top:610px;width:410px;height:300px;padding:24px 28px;background:var(--card);border-style:dashed;--d:0.45000000000000007s"><p class="h" style="font-size:28px;color:var(--muted)">還有其他問題？</p><p style="font-size:24px;margin-top:12px">完整說明在 repo 的 VIBE.md，也可以直接問 AI。</p></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="11" fill="#fff" stroke="var(--l5)" stroke-width="6"/><text x="1790" y="1039" text-anchor="end" style="font:800 19px var(--cjk);fill:var(--l5)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>終點以外</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px;--d:.05s">更新、解除安裝、交給工程師</h2><div class="prompt reveal" style="left:110px;top:280px;width:540px;height:440px;--d:0.15s"><div class="bar"><span>更新工具</span><span class="sp"></span><button class="copy">複製</button></div><pre style="font-size:23px">請幫我更新 ~/Developer/ios-dev-skill 的 vibe 開發工具。
+先檢查有沒有我自己的未保存修改，不要覆蓋或丟棄它們。
+說明需要更新的項目，再執行安裝與 ./install.sh --vibe --check，告訴我是否需要重新開啟 AI。</pre></div><div class="t reveal" style="left:110px;top:750px;width:540px;font-size:25px;--d:0.4s;color:var(--ink2)">更新的是開發工具，不代表替你的 app 加了功能。</div><div class="prompt reveal" style="left:690px;top:280px;width:540px;height:440px;--d:0.25s"><div class="bar"><span>解除安裝</span><span class="sp"></span><button class="copy">複製</button></div><pre style="font-size:23px">請在 ~/Developer/ios-dev-skill 執行 ./install.sh --vibe --uninstall。
+告訴我移除了哪些工具連結與全域設定，以及還保留哪些相依工具。
+不要刪除我做的 app 專案或手機資料。</pre></div><div class="t reveal" style="left:690px;top:750px;width:540px;font-size:25px;--d:0.5s;color:var(--ink2)">其他共用的 skill、plugin 與模擬器工具不會自動移除。</div><div class="prompt reveal" style="left:1270px;top:280px;width:540px;height:440px;--d:0.35s"><div class="bar"><span>交給工程師</span><span class="sp"></span><button class="copy">複製</button></div><pre style="font-size:23px">請幫我整理這個 app，準備交給工程師接手。
+用一頁說明目前有哪些功能、已知問題、做過哪些檢查，以及我接下來想做什麼。
+請整理成 HANDOFF.md，並告訴我專案資料夾的位置。</pre></div><div class="t reveal" style="left:1270px;top:750px;width:540px;font-size:25px;--d:0.6000000000000001s;color:var(--ink2)">工程師會看：HANDOFF.md、docs/vibe-decisions.md、docs/features/、原始碼與測試。</div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path d="M110 1032 H1810" stroke="#cfc9bb" stroke-width="4" fill="none"/><circle cx="110" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="130" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">上車前</text><circle cx="535" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="555" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">出發</text><circle cx="960" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="980" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">試用卡</text><circle cx="1385" cy="1032" r="6" fill="var(--ink2)" stroke="var(--ink2)" stroke-width="3"/><text x="1405" y="1038" text-anchor="start" style="font:500 18px var(--cjk);fill:var(--muted)">日常</text><circle cx="1810" cy="1032" r="11" fill="#fff" stroke="var(--l5)" stroke-width="6"/><text x="1790" y="1039" text-anchor="end" style="font:800 19px var(--cjk);fill:var(--l5)">終點以外</text></svg>
+</section>
+<section class="slide" style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>IOS-VIBE · 直達車</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.2s;stroke-width:14px" d="M-20 1000 H1940"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:6px;--d:0.5s" cx="300" cy="1000" r="14"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:6px;--d:0.5s" cx="700" cy="1000" r="14"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:6px;--d:0.5s" cx="1100" cy="1000" r="14"/><g class="pop" style="--d:.6s"><rect x="1430" y="966" width="130" height="68" rx="34" fill="#fff" stroke="var(--l2)" stroke-width="10"/></g></svg>
+<h2 class="big reveal" style="top:200px;font-size:150px;--d:.1s">一句話上車，<br><span class="amber">試用卡</span>下車。</h2>
+<p class="t reveal" style="left:110px;top:600px;width:1200px;font-size:32px;--d:.3s">你負責想法、選擇與試用；AI 負責工程工作，並留下紀錄。</p>
+<div class="abs reveal" style="left:110px;top:700px;width:1200px;font:700 26px/1.9 var(--mono);color:var(--ink2);--d:.4s">
+  完整指南　github.com/peter6601/ios-dev-skill/blob/main/VIBE.md<br>
+  工程師版　<a href="../" style="color:var(--l3)">ios-dev-skill-deck.vercel.app</a></div>
+<div class="abs reveal" style="left:1380px;top:200px;width:430px;height:500px;background:#fff;border:5px solid var(--ink);border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;--d:.35s">
+  <div style="width:320px;height:320px"><svg style="width:320px;height:320px;max-width:none;max-height:none" viewBox="0 0 330 330" class="segno"><path transform="scale(10)" class="qrline" stroke="#1b1b1b" d="M0 0.5h7m2 0h2m3 0h2m1 0h1m1 0h1m1 0h3m2 0h7m-33 1h1m5 0h1m2 0h4m2 0h1m2 0h1m1 0h2m1 0h2m1 0h1m5 0h1m-33 1h1m1 0h3m1 0h1m5 0h1m2 0h1m1 0h1m2 0h1m1 0h2m2 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m2 0h2m1 0h2m3 0h3m2 0h2m2 0h1m1 0h3m1 0h1m-33 1h1m1 0h3m1 0h1m2 0h4m1 0h1m5 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-33 1h1m5 0h1m1 0h3m2 0h3m2 0h3m5 0h1m5 0h1m-33 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-24 1h1m1 0h1m2 0h2m1 0h1m1 0h4m-23 1h1m2 0h1m1 0h2m1 0h1m1 0h1m1 0h3m1 0h1m2 0h1m1 0h3m1 0h1m1 0h1m-28 1h4m1 0h1m1 0h1m1 0h2m1 0h1m4 0h1m2 0h1m3 0h4m3 0h2m-33 1h2m1 0h1m2 0h7m3 0h2m1 0h4m1 0h2m1 0h2m1 0h1m1 0h1m-33 1h4m5 0h4m1 0h2m3 0h4m5 0h2m2 0h1m-32 1h3m2 0h3m1 0h2m4 0h1m3 0h2m1 0h4m2 0h1m1 0h1m-32 1h2m1 0h2m3 0h1m1 0h2m5 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2m-33 1h3m3 0h8m3 0h1m2 0h2m1 0h1m1 0h3m1 0h3m-27 1h1m3 0h1m1 0h2m2 0h5m1 0h1m2 0h1m1 0h2m3 0h1m-31 1h4m1 0h1m1 0h3m2 0h1m1 0h3m3 0h4m1 0h1m1 0h1m2 0h1m-31 1h1m1 0h1m1 0h1m2 0h6m3 0h2m2 0h1m1 0h3m1 0h1m1 0h1m1 0h1m-32 1h2m2 0h5m1 0h1m3 0h1m1 0h1m1 0h1m2 0h2m1 0h1m5 0h1m1 0h1m-33 1h1m1 0h1m2 0h1m3 0h1m3 0h1m1 0h11m1 0h1m3 0h2m-32 1h2m1 0h3m1 0h4m1 0h1m2 0h2m1 0h1m1 0h5m1 0h1m-26 1h4m1 0h1m3 0h1m2 0h1m1 0h2m2 0h2m3 0h2m4 0h2m-33 1h2m1 0h4m1 0h1m2 0h2m1 0h1m2 0h3m1 0h1m2 0h1m1 0h2m1 0h2m1 0h1m-32 1h1m1 0h1m3 0h1m1 0h3m4 0h1m2 0h4m1 0h1m3 0h2m1 0h2m-33 1h1m3 0h5m2 0h2m1 0h2m1 0h2m1 0h2m1 0h7m1 0h1m-24 1h1m2 0h2m3 0h4m2 0h1m1 0h1m3 0h2m1 0h2m-33 1h7m2 0h2m1 0h2m2 0h1m1 0h1m1 0h2m2 0h1m1 0h1m1 0h4m-32 1h1m5 0h1m1 0h3m1 0h1m1 0h1m1 0h2m1 0h4m1 0h1m3 0h1m3 0h1m-33 1h1m1 0h3m1 0h1m3 0h1m1 0h3m5 0h3m1 0h6m-30 1h1m1 0h3m1 0h1m1 0h3m1 0h1m10 0h1m2 0h1m1 0h2m-30 1h1m1 0h3m1 0h1m2 0h3m5 0h1m3 0h1m6 0h1m3 0h1m-33 1h1m5 0h1m2 0h5m1 0h1m1 0h1m2 0h2m1 0h4m2 0h1m-30 1h7m1 0h2m2 0h2m4 0h2m1 0h1m2 0h1m3 0h2m1 0h1"/></svg></div>
+  <p class="mono" style="font:700 22px/1 var(--mono);letter-spacing:.06em;color:var(--muted)">掃描看 VIBE.md</p></div>
+
+</section>
+</main>
+<div class="progress" id="progress"></div>
+</div>
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   方向鍵／空白鍵／PageUp-Down／滑鼠滾輪／觸控滑動；網址 #頁碼 可直接跳頁
+   =========================================== */
+class SlidePresentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.stage = document.getElementById('deckStage');
+    this.bar = document.getElementById('progress');
+    this.current = 0;
+    this.slides.forEach((s, i) => {
+      const pg = s.querySelector('.pg');
+      if (pg) pg.textContent = String(i + 1).padStart(2, '0') + ' / ' + String(this.slides.length).padStart(2, '0');
+    });
+    this.fit(); addEventListener('resize', () => this.fit());
+    this.keys(); this.wheel(); this.touch();
+    const h = parseInt(location.hash.slice(1), 10);
+    this.show(Number.isFinite(h) ? h - 1 : 0, true);
+    addEventListener('hashchange', () => { const n = parseInt(location.hash.slice(1), 10); if (Number.isFinite(n) && n - 1 !== this.current) this.show(n - 1); });
+  }
+  fit() {
+    const f = Math.min(innerWidth / 1920, innerHeight / 1080);
+    this.stage.style.transform = `translate(${(innerWidth - 1920 * f) / 2}px, ${(innerHeight - 1080 * f) / 2}px) scale(${f})`;
+  }
+  editing() { const a = document.activeElement; return a && a.isContentEditable; }
+  keys() {
+    addEventListener('keydown', e => {
+      if (this.editing()) return;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); this.show(this.current + 1); }
+      if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); this.show(this.current - 1); }
+      if (e.key === 'Home') this.show(0);
+      if (e.key === 'End') this.show(this.slides.length - 1);
+    });
+  }
+  wheel() {
+    let lock = false;
+    addEventListener('wheel', e => {
+      if (this.editing() || lock || Math.abs(e.deltaY) < 20) return;
+      lock = true; setTimeout(() => lock = false, 700);
+      this.show(this.current + (e.deltaY > 0 ? 1 : -1));
+    }, { passive: true });
+  }
+  touch() {
+    let x0 = null, y0 = null;
+    addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    addEventListener('touchend', e => {
+      if (x0 === null || this.editing()) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) this.show(this.current + (dx < 0 ? 1 : -1));
+      x0 = null;
+    }, { passive: true });
+  }
+  show(i, first) {
+    i = Math.max(0, Math.min(i, this.slides.length - 1));
+    if (i === this.current && !first) return;
+    this.slides.forEach((s, k) => { s.classList.toggle('active', k === i); if (k !== i) s.classList.remove('visible'); });
+    const s = this.slides[i];
+    requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+    this.current = i;
+    this.bar.style.width = ((i + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+}
+
+/* ===========================================
+   INLINE EDITOR — E 鍵或左上角開關；Ctrl/Cmd+S 下載改好的檔案
+   修改會暫存在這台瀏覽器（localStorage），換台電腦不會帶過去
+   =========================================== */
+class InlineEditor {
+  constructor() {
+    this.isActive = false;
+    this.dirty = false;
+    this.btn = document.getElementById('editToggle');
+    this.toastEl = document.getElementById('toast');
+    this.targets = [...document.querySelectorAll('.slide *')].filter(el =>
+      !el.closest('svg') && !el.closest('button') && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) );
+    /* 暫存的 key 綁定原始內容的雜湊：檔案本身改版後，舊的瀏覽器暫存自動失效，不會蓋掉新內容 */
+    let h = 0; const src = this.targets.map(t => t.innerHTML).join('\u0001');
+    for (let i = 0; i < src.length; i++) h = (h * 31 + src.charCodeAt(i)) | 0;
+    this.key = 'iosvibe-express-deck:' + (h >>> 0).toString(36);
+    this.restore();
+    this.bind();
+  }
+  restore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.key) || 'null');
+      if (saved && saved.length === this.targets.length) saved.forEach((h, i) => { if (h !== null) this.targets[i].innerHTML = h; });
+    } catch (e) {}
+  }
+  save() {
+    try { localStorage.setItem(this.key, JSON.stringify(this.targets.map(t => t.innerHTML))); } catch (e) {}
+  }
+  toggle() {
+    this.isActive = !this.isActive;
+    document.body.classList.toggle('editing', this.isActive);
+    this.btn.classList.toggle('active', this.isActive);
+    this.btn.textContent = this.isActive ? '完成編輯 (E)' : '編輯 (E)';
+    this.targets.forEach(t => t.contentEditable = this.isActive ? 'true' : 'false');
+    if (!this.isActive) { if (this.dirty) { this.save(); this.toast('已暫存在這台瀏覽器'); } document.activeElement && document.activeElement.blur(); }
+  }
+  toast(msg) { this.toastEl.textContent = msg; this.toastEl.classList.add('show'); setTimeout(() => this.toastEl.classList.remove('show'), 1600); }
+  download() {
+    this.save();
+    const doc = document.documentElement.cloneNode(true);
+    doc.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+    doc.querySelector('body').classList.remove('editing');
+    doc.querySelectorAll('.slide').forEach(s => s.classList.remove('active', 'visible'));
+    const blob = new Blob(['<!DOCTYPE html>\n' + doc.outerHTML], { type: 'text/html' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ios-vibe-直達車.html'; a.click();
+    this.toast('已下載修改後的 HTML');
+  }
+  bind() {
+    const hot = document.querySelector('.edit-hotzone'); let t = null;
+    const show = () => { clearTimeout(t); this.btn.classList.add('show'); };
+    const hide = () => { t = setTimeout(() => { if (!this.isActive) this.btn.classList.remove('show'); }, 400); };
+    hot.addEventListener('mouseenter', show); hot.addEventListener('mouseleave', hide);
+    this.btn.addEventListener('mouseenter', show); this.btn.addEventListener('mouseleave', hide);
+    hot.addEventListener('click', () => this.toggle()); this.btn.addEventListener('click', () => this.toggle());
+    addEventListener('keydown', e => {
+      if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey && !(document.activeElement && document.activeElement.isContentEditable)) this.toggle();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); this.download(); }
+    });
+    document.addEventListener('input', () => { this.dirty = true; this.save(); });
+  }
+}
+
+window.deck = new SlidePresentation();
+window.editor = new InlineEditor();
+
+/* ===========================================
+   COPY BUTTONS + CLAUDE/CODEX SWITCH
+   每張指令卡右上角「複製」；切換 Claude／Codex 會同步改所有 /ios-vibe ↔ $ios-vibe
+   =========================================== */
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch (err) {
+    const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e2) {}
+    ta.remove(); return ok;
+  }
+}
+document.querySelectorAll('.prompt .copy').forEach(btn => btn.addEventListener('click', async ev => {
+  ev.stopPropagation();
+  const ok = await copyText(btn.closest('.prompt').querySelector('pre').textContent);
+  btn.textContent = ok ? '已複製 ✓' : '請手動選取';
+  btn.classList.toggle('done', ok);
+  setTimeout(() => { btn.textContent = '複製'; btn.classList.remove('done'); }, 1600);
+  btn.blur();
+}));
+const PLAT_KEY = 'iosvibe-platform';
+function setPlat(p) {
+  document.querySelectorAll('.cmd').forEach(el => el.textContent = p === 'codex' ? '$ios-vibe' : '/ios-vibe');
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  try { localStorage.setItem(PLAT_KEY, p); } catch (e) {}
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); setPlat(b.dataset.p); b.blur(); }));
+let plat = 'claude';
+try { plat = localStorage.getItem(PLAT_KEY) || 'claude'; } catch (e) {}
+setPlat(plat);
+</script>
+</body>
+</html>
