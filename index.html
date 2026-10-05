@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一句話，七條路線 — ios-dev-skill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   THEME TOKENS — 改顏色、字體從這裡改
+   路線色 l1–l7 對應七種情境，整份簡報固定不變
+   =========================================== */
+:root{
+  --stage-bg:#d9d4c7; --slide-bg:#F3EFE4;
+  --ink:#1B1B1B; --ink2:#3b3a36; --muted:#77736a; --card:#FFFDF7; --river:#DCE7EA; --rule:rgba(27,27,27,.14);
+  --cream:#EDE8DC;
+  --l1:#D2232A; --l2:#E89A00; --l3:#0070BD; --l4:#00964B; --l5:#8B4A9C; --l6:#A0662C; --l7:#00A0A8;
+  --latin:'Overpass','Noto Sans TC',sans-serif;
+  --cjk:'Noto Sans TC','Overpass',sans-serif;
+  --mono:'Overpass Mono','Noto Sans TC',monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ===========================================
+   FIXED 16:9 STAGE — viewport-base.css（完整收錄）
+   =========================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+img,video,canvas,svg{max-width:100%;max-height:100%}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
+  .deck-viewport{position:static;overflow:visible;background:#fff}
+  .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none}
+  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .deck-controls{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
+
+/* ===========================================
+   SLIDE BASE — 米色紙＋點陣網格，像一張路網圖
+   =========================================== */
+.slide{color:var(--ink);font-family:var(--cjk);--acc:var(--sec);
+  background-image:radial-gradient(rgba(27,27,27,.085) 1.5px,transparent 1.6px);background-size:40px 40px;
+  transition:opacity .45s ease,visibility 0s linear .45s}
+.slide.active{transition:opacity .45s ease,visibility 0s}
+.abs{position:absolute}
+.hl{color:var(--acc)}
+.red{color:var(--l1)} .amber{color:var(--l2)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+
+/* === HEADER（每頁頂端的站牌列） === */
+.hdr{position:absolute;left:110px;right:110px;top:52px;display:flex;justify-content:space-between;align-items:center;
+  font:700 20px/1 var(--mono);letter-spacing:.06em;color:var(--muted)}
+.hdr .sec{display:flex;align-items:center;gap:12px;color:var(--ink2)}
+.hdr .sec i{width:30px;height:12px;border-radius:6px;background:var(--sec);display:block}
+
+/* === TYPE === */
+.kicker{position:absolute;left:110px;font:700 26px/1 var(--mono);letter-spacing:.08em;color:var(--acc)}
+.title{position:absolute;left:110px;top:150px;font:900 88px/1.18 var(--cjk);letter-spacing:.01em}
+.big{position:absolute;left:104px;font:900 140px/1.14 var(--cjk);letter-spacing:.01em}
+.lead{position:absolute;left:110px;font:500 36px/1.6 var(--cjk);color:var(--ink2)}
+.sub{position:absolute;left:110px;font:500 32px/1.5 var(--cjk);color:var(--muted)}
+.foot{position:absolute;left:110px;font:500 28px/1.5 var(--cjk);color:var(--muted)}
+.lead b,.sub b,.foot b{color:var(--ink);font-weight:700}
+
+/* === BADGES === */
+.badge{display:inline-block;width:46px;height:46px;border-radius:10px;color:#fff;font:900 28px/48px var(--latin);text-align:center;flex:none}
+.tag{display:inline-block;padding:6px 14px;border-radius:999px;font:700 20px/1 var(--mono);letter-spacing:.06em;border:3px solid currentColor}
+
+/* === CARDS（月台牌） === */
+.card{position:absolute;background:var(--card);border:5px solid var(--ink);border-radius:28px;padding:30px 40px}
+.card .ct{font:900 40px/1.2 var(--cjk)}
+.card .ct small{font:500 26px/1 var(--cjk);color:var(--muted);margin-left:14px}
+.card p{font:500 30px/1.55 var(--cjk);color:var(--ink2);margin-top:12px}
+.term-card{position:absolute;background:var(--ink);color:var(--cream);border-radius:28px;padding:34px 44px;font:500 26px/1.7 var(--mono)}
+.term-card .k{color:#9c978b}
+.term-card .c{color:#7d796f}
+
+/* === SVG MAP PRIMITIVES === */
+svg.map{position:absolute;left:0;top:0;width:1920px;height:1080px;max-width:none;max-height:none;overflow:visible;pointer-events:none}
+.ln{fill:none;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1 1;stroke-dashoffset:1}
+.slide.visible .ln{stroke-dashoffset:0;transition:stroke-dashoffset 1.4s var(--ease) var(--d,.3s)}
+.stn{fill:#fff;stroke:var(--ink);stroke-width:6}
+.term{fill:#fff;stroke-width:8}
+.hub{fill:#fff;stroke:var(--ink);stroke-width:9}
+.river{fill:none;stroke:var(--river);stroke-width:120;stroke-linecap:round}
+.t-lab{font:700 28px var(--cjk);fill:var(--ink)}
+.t-sm{font:500 24px var(--cjk);fill:var(--muted)}
+.t-mono{font:700 24px var(--mono);fill:var(--muted);letter-spacing:.04em}
+.t-num{font:900 44px var(--latin);fill:var(--ink)}
+
+/* === REVEAL ANIMATIONS（換頁時依序出現） === */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .8s var(--ease) var(--d,0s),transform .8s var(--ease) var(--d,0s)}
+.slide.visible .reveal{opacity:1;transform:none}
+.pop{opacity:0;transform:scale(.6);transform-box:fill-box;transform-origin:center;transition:opacity .6s var(--ease) var(--d,.2s),transform .6s var(--ease) var(--d,.2s)}
+.slide.visible .pop{opacity:1;transform:none}
+
+/* === SECTION SIGN（章節站牌） === */
+.sign-band{position:absolute;left:0;right:0;top:300px;height:380px;background:var(--ink);border-bottom:22px solid var(--sec);
+  display:flex;align-items:center;gap:56px;padding-left:150px}
+.sign-num{width:180px;height:180px;border-radius:50%;background:var(--sec);color:#fff;font:900 110px/184px var(--latin);text-align:center;flex:none}
+.sign-name{color:#fff;font:900 136px/1.1 var(--cjk);letter-spacing:.02em}
+.sign-en{color:#b9b4a8;font:800 36px/1 var(--latin);letter-spacing:.14em;margin-top:22px}
+.sign-top{position:absolute;left:150px;top:220px;font:700 26px/1 var(--mono);letter-spacing:.1em;color:var(--muted)}
+
+/* ===========================================
+   INLINE EDITING — 左上角 hover 或按 E 進入編輯
+   =========================================== */
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer}
+.edit-toggle{position:fixed;top:16px;left:16px;z-index:10001;opacity:0;pointer-events:none;transition:opacity .3s ease;
+  border:3px solid var(--ink);background:var(--card);border-radius:999px;padding:8px 16px;font:700 14px/1 var(--mono);cursor:pointer}
+.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto}
+.edit-toggle.active{background:var(--l2);color:#fff;border-color:var(--l2)}
+body.editing [contenteditable="true"]{outline:2px dashed rgba(0,112,189,.55);outline-offset:4px;cursor:text}
+.toast{position:fixed;right:20px;bottom:20px;z-index:10002;background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font:700 14px/1 var(--mono);opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.progress{position:fixed;left:0;bottom:0;height:4px;background:var(--ink);z-index:999;transition:width .4s var(--ease)}
+
+.chips .chip{width:26px;height:10px;border-radius:5px;display:block}
+</style>
+</head>
+<body>
+<div class="edit-hotzone" aria-hidden="true"></div>
+<button class="edit-toggle" id="editToggle" title="編輯模式 (E)">編輯 (E)</button>
+<div class="toast" id="toast" role="status"></div>
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage" aria-label="ios-dev-skill 簡報">
+<section class="slide" style="--sec:var(--ink)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span>
+  <span style="display:flex;gap:8px" class="chips"><i class="chip" style="background:var(--l1)"></i><i class="chip" style="background:var(--l2)"></i><i class="chip" style="background:var(--l3)"></i><i class="chip" style="background:var(--l4)"></i><i class="chip" style="background:var(--l5)"></i><i class="chip" style="background:var(--l6)"></i><i class="chip" style="background:var(--l7)"></i></span>
+  <span>CLAUDE CODE · CODEX</span></header>
+<h1 class="abs reveal" style="left:104px;top:132px;font:900 132px/1.12 var(--cjk);letter-spacing:.01em;--d:.1s">一句話，七條路線。</h1>
+<p class="sub reveal" style="top:300px;color:var(--ink2);--d:.2s">給 AI 的 iOS 開發路由：<b style="font-family:var(--latin);font-weight:800">/ios-dev</b> 先認情境、查架構影響，再決定走哪一條。</p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="river" d="M-80 1010 C 300 980, 420 860, 760 880 S 1220 1060, 1500 1010 S 1820 880, 2000 900"/><path class="ln" pathLength="1" style="stroke:var(--ink);--d:.2s" d="M150 720 H450"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.25s" cx="150" cy="720" r="18"/><text class="t-lab" x="150" y="784" text-anchor="middle" >一句話需求</text><text class="t-mono" x="150" y="814" text-anchor="middle" >START</text><path class="ln" pathLength="1" style="stroke:var(--l1);--d:0.55s;stroke-width:11px" d="M670 666 H700 L916 450 H1460" /><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.63s;stroke-width:11px" d="M670 684 H750 L894 540 H1460" /><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.7100000000000001s;stroke-width:11px" d="M670 702 H800 L872 630 H1460" /><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.79s;stroke-width:11px" d="M670 720 H1460" /><path class="ln" pathLength="1" style="stroke:var(--l5);--d:0.8700000000000001s;stroke-width:11px" d="M670 738 H800 L872 810 H1460" /><path class="ln" pathLength="1" style="stroke:var(--l6);--d:0.9500000000000001s;stroke-width:11px" d="M670 756 H750 L894 900 H1460" /><path class="ln" pathLength="1" style="stroke:var(--l7);--d:1.03s;stroke-width:11px" d="M670 774 H700 L916 990 H1460" /><circle class="term pop" style="stroke:var(--l1);--d:1.2s" cx="1460" cy="450" r="16"/><circle class="term pop" style="stroke:var(--l2);--d:1.2s" cx="1460" cy="540" r="16"/><circle class="term pop" style="stroke:var(--l3);--d:1.2s" cx="1460" cy="630" r="16"/><circle class="term pop" style="stroke:var(--l4);--d:1.2s" cx="1460" cy="720" r="16"/><circle class="term pop" style="stroke:var(--l5);--d:1.2s" cx="1460" cy="810" r="16"/><circle class="term pop" style="stroke:var(--l6);--d:1.2s" cx="1460" cy="900" r="16"/><circle class="term pop" style="stroke:var(--l7);--d:1.2s" cx="1460" cy="990" r="16"/><g class="pop" style="--d:.25s"><rect class="hub" x="440" y="632" width="230" height="176" rx="44"/><text class="" x="555" y="722" text-anchor="middle" style="font:800 36px var(--mono);fill:var(--ink)">/ios-dev</text><text class="" x="555" y="760" text-anchor="middle" style="font:700 20px var(--cjk);fill:var(--muted)">Step 0 確認</text></g></svg>
+<div class="abs reveal" style="left:1500px;top:427px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.00s"><span class="badge" style="background:var(--l1)">1</span><b style="font:700 34px/1 var(--cjk)">新專案／大功能</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">NEW</small></div><div class="abs reveal" style="left:1500px;top:517px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.08s"><span class="badge" style="background:var(--l2)">2</span><b style="font:700 34px/1 var(--cjk)">小功能</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">FEATURE</small></div><div class="abs reveal" style="left:1500px;top:607px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.16s"><span class="badge" style="background:var(--l3)">3</span><b style="font:700 34px/1 var(--cjk)">純畫面</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">UI ONLY</small></div><div class="abs reveal" style="left:1500px;top:697px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.24s"><span class="badge" style="background:var(--l4)">4</span><b style="font:700 34px/1 var(--cjk)">修正</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">BUGFIX</small></div><div class="abs reveal" style="left:1500px;top:787px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.32s"><span class="badge" style="background:var(--l5)">5</span><b style="font:700 34px/1 var(--cjk)">優化</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">PERF</small></div><div class="abs reveal" style="left:1500px;top:877px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.40s"><span class="badge" style="background:var(--l6)">6</span><b style="font:700 34px/1 var(--cjk)">重構</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">REFACTOR</small></div><div class="abs reveal" style="left:1500px;top:967px;height:46px;display:flex;align-items:center;gap:18px;white-space:nowrap;--d:1.48s"><span class="badge" style="background:var(--l7)">7</span><b style="font:700 34px/1 var(--cjk)">接 ticket</b><small class="mono muted" style="font-size:17px;letter-spacing:.08em;font-weight:600">TICKET</small></div>
+<p class="abs reveal mono muted" style="left:110px;top:990px;font-size:22px;font-weight:700;letter-spacing:.04em;--d:.4s">github.com/peter6601/ios-dev-skill</p>
+</section>
+<section class="slide " style="--sec:var(--ink);--acc:var(--l1)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:210px">起點 · WHY</p>
+<h2 class="big reveal" style="top:265px;font-size:120px;--d:.1s">AI 很會寫 code。<br>問題是，<span class="red">它太快開始寫</span>。</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:12px" d="M110 790 H1810" /><g class="pop" style="--d:.9s"><circle cx="420" cy="790" r="36" fill="#fff" stroke="var(--l1)" stroke-width="9"/><path d="M406 776 L434 804 M434 776 L406 804" stroke="var(--l1)" stroke-width="8" stroke-linecap="round"/></g><g class="pop" style="--d:.9s"><circle cx="960" cy="790" r="36" fill="#fff" stroke="var(--l1)" stroke-width="9"/><path d="M946 776 L974 804 M974 776 L946 804" stroke="var(--l1)" stroke-width="8" stroke-linecap="round"/></g><g class="pop" style="--d:.9s"><circle cx="1500" cy="790" r="36" fill="#fff" stroke="var(--l1)" stroke-width="9"/><path d="M1486 776 L1514 804 M1514 776 L1486 804" stroke="var(--l1)" stroke-width="8" stroke-linecap="round"/></g></svg>
+<div class="abs reveal" style="left:160px;top:852px;width:520px;text-align:center;--d:1.00s"><p style="font:900 38px/1.3 var(--cjk)">沒問清楚就開工</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:8px">需求、範圍、驗收沒對齊</p></div><div class="abs reveal" style="left:700px;top:852px;width:520px;text-align:center;--d:1.12s"><p style="font:900 38px/1.3 var(--cjk)">改 UI，順手動了狀態</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:8px">畫面改動牽動 state 與導航</p></div><div class="abs reveal" style="left:1240px;top:852px;width:520px;text-align:center;--d:1.24s"><p style="font:900 38px/1.3 var(--cjk)">修個 bug，修成重構</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:8px">沒找到根因就動手</p></div>
+</section>
+<section class="slide " style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="top:170px;font-size:100px">在寫 code 之前，<br>先加一個<span class="hl">轉乘站</span>。</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.35s;stroke-width:10px" d="M540 560 H600 L740 700 H840" /><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.44999999999999996s;stroke-width:10px" d="M540 670 H650 L695 715 H840" /><path class="ln" pathLength="1" style="stroke:var(--l5);--d:0.55s;stroke-width:10px" d="M540 780 H650 L700 730 H840" /><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.65s;stroke-width:10px" d="M540 890 H600 L745 745 H840" /><path class="ln" pathLength="1" style="stroke:var(--ink);--d:1.0s;stroke-width:12px" d="M1060 725 H1760" /><g class="pop" style="--d:.6s"><rect class="hub" x="840" y="640" width="220" height="170" rx="44"/><text class="" x="950" y="728" text-anchor="middle" style="font:800 34px var(--mono);fill:var(--ink)">/ios-dev</text><text class="t-sm" x="950" y="768" text-anchor="middle" >Step 0</text></g><g class="pop" style="--d:1.4s"><rect x="1270" y="693" width="140" height="64" rx="32" fill="#fff" stroke="var(--l2)" stroke-width="9"/></g><text class="t-lab" x="1340" y="815" text-anchor="middle" style="font-size:34px;fill:var(--l2)">你確認一次</text><circle class="term pop" style="stroke:var(--ink);--d:1.7s" cx="1760" cy="725" r="22"/><text class="t-lab" x="1760" y="815" text-anchor="middle" style="font-size:34px">開工</text></svg>
+<div class="abs reveal" style="left:110px;top:522px;width:430px;height:76px;border:5px solid var(--ink);border-radius:38px;background:var(--card);display:flex;align-items:center;gap:16px;padding-left:16px;--d:0.10s"><span class="badge" style="background:var(--l2);width:40px;height:40px;font-size:24px;line-height:42px;border-radius:9px">2</span><span style="font:700 28px/1 var(--cjk)">設定頁加匯出功能</span></div><div class="abs reveal" style="left:110px;top:632px;width:430px;height:76px;border:5px solid var(--ink);border-radius:38px;background:var(--card);display:flex;align-items:center;gap:16px;padding-left:16px;--d:0.18s"><span class="badge" style="background:var(--l4);width:40px;height:40px;font-size:24px;line-height:42px;border-radius:9px">4</span><span style="font:700 28px/1 var(--cjk)">登入後畫面卡住</span></div><div class="abs reveal" style="left:110px;top:742px;width:430px;height:76px;border:5px solid var(--ink);border-radius:38px;background:var(--card);display:flex;align-items:center;gap:16px;padding-left:16px;--d:0.26s"><span class="badge" style="background:var(--l5);width:40px;height:40px;font-size:24px;line-height:42px;border-radius:9px">5</span><span style="font:700 28px/1 var(--cjk)">首頁捲動好卡</span></div><div class="abs reveal" style="left:110px;top:852px;width:430px;height:76px;border:5px solid var(--ink);border-radius:38px;background:var(--card);display:flex;align-items:center;gap:16px;padding-left:16px;--d:0.34s"><span class="badge" style="background:var(--l7);width:40px;height:40px;font-size:24px;line-height:42px;border-radius:9px">7</span><span style="font:700 28px/1 var(--cjk)">接 T3 這張 ticket</span></div>
+</section>
+<section class="slide " style="--sec:var(--ink);--acc:var(--l1)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="top:165px;font-size:84px">一句話描述需求，<br>它挑工具、排流程，<span class="hl">你確認一次</span>。</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:12px" d="M110 760 H1810" /><circle class="stn pop" style="stroke:var(--l1);stroke-width:9px;--d:0.7s" cx="330" cy="760" r="26"/><circle class="stn pop" style="stroke:var(--l3);stroke-width:9px;--d:0.7999999999999999s" cx="760" cy="760" r="26"/><circle class="stn pop" style="stroke:var(--l5);stroke-width:9px;--d:0.8999999999999999s" cx="1190" cy="760" r="26"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:9px;--d:1.0s" cx="1620" cy="760" r="26"/></svg>
+<div class="abs reveal" style="left:110px;width:440px;text-align:center;top:560px;--d:0.50s"><p style="font:900 150px/1 var(--latin);color:var(--l1)">12</p></div><div class="abs reveal" style="left:110px;width:440px;text-align:center;top:815px;--d:0.70s"><p style="font:800 36px/1.2 var(--cjk)">skills</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">工作指引</p></div><div class="abs reveal" style="left:540px;width:440px;text-align:center;top:560px;--d:0.60s"><p style="font:900 150px/1 var(--latin);color:var(--l3)">9</p></div><div class="abs reveal" style="left:540px;width:440px;text-align:center;top:815px;--d:0.80s"><p style="font:800 36px/1.2 var(--cjk)">agents</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">審查助手</p></div><div class="abs reveal" style="left:970px;width:440px;text-align:center;top:560px;--d:0.70s"><p style="font:900 150px/1 var(--latin);color:var(--l5)">7</p></div><div class="abs reveal" style="left:970px;width:440px;text-align:center;top:815px;--d:0.90s"><p style="font:800 36px/1.2 var(--cjk)">情境</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">一個入口</p></div><div class="abs reveal" style="left:1400px;width:440px;text-align:center;top:560px;--d:0.80s"><p style="font:900 150px/1 var(--latin);color:var(--l4)">2</p></div><div class="abs reveal" style="left:1400px;width:440px;text-align:center;top:815px;--d:1.00s"><p style="font:800 36px/1.2 var(--cjk)">平台</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">Claude Code・Codex</p></div>
+<p class="abs reveal mono muted" style="left:110px;top:990px;font-size:22px;font-weight:700;letter-spacing:.04em;--d:1.1s">MIT · github.com/peter6601/ios-dev-skill</p>
+</section>
+<section class="slide " style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<h2 class="title reveal">誰負責哪一段？</h2>
+<p class="sub reveal" style="top:262px;--d:.1s">Skill 是<b>工作指引</b>，agent 是<b>審查助手</b>。</p>
+<div class="card reveal" style="left:110px;top:360px;width:780px;border-left:20px solid var(--l2);--d:0.20s"><p class="ct">你<small>需求與決策</small></p><p>說明目標、範圍與驗收<br>閱讀成果，確認交付</p></div><div class="card reveal" style="left:1030px;top:360px;width:780px;border-left:20px solid var(--ink);--d:0.30s"><p class="ct">ios-dev<small>流程入口</small></p><p>辨識情境與架構影響<br>選 skill 與審查 agent</p></div><div class="card reveal" style="left:110px;top:650px;width:700px;border-left:20px solid var(--l3);--d:0.40s"><p class="ct">主 session＋skills<small>執行工作</small></p><p>依指引規劃、實作與驗證<br>整合 findings，統一修復</p></div><div class="card reveal" style="left:1110px;top:650px;width:700px;border-left:20px solid var(--l5);--d:0.50s"><p class="ct">審查 agents<small>獨立檢查</small></p><p>檢查程式碼、體驗與風險<br>只回報，不改程式碼</p></div><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.6s;stroke-width:8px" d="M900 475 H1010" /><path class="pop" style="--d:.9s" d="M996 461 L1016 475 L996 489" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.9s;stroke-width:8px" d="M840 760 H1080" /><path class="pop" style="--d:1.2s" d="M1064 746 L1084 760 L1064 774" fill="none" stroke="var(--l3)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><text class="t-sm" x="960" y="735" text-anchor="middle" >送審</text><path class="ln" pathLength="1" style="stroke:var(--l5);--d:1.1s;stroke-width:8px" d="M1080 840 H840" /><path class="pop" style="--d:1.4s" d="M856 826 L836 840 L856 854" fill="none" stroke="var(--l5)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><text class="t-mono" x="960" y="885" text-anchor="middle" >findings</text></svg>
+<p class="foot reveal" style="top:960px;--d:1s">依任務啟動需要的 agent，不是每次全開。</p>
+</section>
+<section class="slide " style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:96px">從需求到交付</h2>
+<p class="sub reveal" style="top:285px;--d:.1s">規劃深度與審查強度，依任務調整。<span class="amber" style="font-weight:700">黃圈</span>是需要你的站。</p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:12px" d="M150 470 H1660 L1760 570 V720 L1660 820 H700" /><circle class="pop" style="--d:.3s" cx="150" cy="470" r="12" fill="var(--ink)"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.6s" cx="250" cy="470" r="20"/><text class="t-mono" x="250" y="426" text-anchor="middle" >01</text><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:0.72s" cx="700" cy="470" r="24"/><text class="t-mono" x="700" y="426" text-anchor="middle" style="fill:var(--l2)">02</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.84s" cx="1150" cy="470" r="20"/><text class="t-mono" x="1150" y="426" text-anchor="middle" >03</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.96s" cx="1600" cy="470" r="20"/><text class="t-mono" x="1600" y="426" text-anchor="middle" >04</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.08s" cx="1600" cy="820" r="20"/><text class="t-mono" x="1600" y="776" text-anchor="middle" >05</text><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:1.2s" cx="1150" cy="820" r="24"/><text class="t-mono" x="1150" y="776" text-anchor="middle" style="fill:var(--l2)">06</text><circle class="term pop" style="stroke:var(--ink);--d:1.5s" cx="700" cy="820" r="24"/><text class="t-mono" x="700" y="776" text-anchor="middle" >07</text></svg>
+<div class="abs reveal" style="left:50px;top:518px;width:400px;text-align:center;--d:0.70s"><p style="font:900 36px/1.3 var(--cjk)">描述需求</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">目標・範圍・驗收</p></div><div class="abs reveal" style="left:500px;top:518px;width:400px;text-align:center;--d:0.82s"><p style="font:900 36px/1.3 var(--cjk)">確認流程</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">情境・架構影響</p></div><div class="abs reveal" style="left:950px;top:518px;width:400px;text-align:center;--d:0.94s"><p style="font:900 36px/1.3 var(--cjk)">規劃或讀契約</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">短計畫／規格／ticket</p></div><div class="abs reveal" style="left:1400px;top:518px;width:400px;text-align:center;--d:1.06s"><p style="font:900 36px/1.3 var(--cjk)">實作與驗證</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">測試・Preview・量測</p></div><div class="abs reveal" style="left:1400px;top:868px;width:400px;text-align:center;--d:1.18s"><p style="font:900 36px/1.3 var(--cjk)">審查與修復</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">依風險選路線</p></div><div class="abs reveal" style="left:950px;top:868px;width:400px;text-align:center;--d:1.30s"><p style="font:900 36px/1.3 var(--cjk)">人工審閱</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">diff・證據・未解決事項</p></div><div class="abs reveal" style="left:500px;top:868px;width:400px;text-align:center;--d:1.42s"><p style="font:900 36px/1.3 var(--cjk)">依授權交付</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">提交・回寫・接續工作</p></div>
+<p class="foot reveal" style="left:110px;top:800px;width:400px;font-size:26px;--d:1.5s">已有完整契約的 ticket，<br>沿用規劃，不重跑需求訪談。</p>
+</section>
+<section class="slide " style="--sec:var(--l1)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 01 / 05</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">1</span>
+  <div><h2 class="sign-name">轉乘站：Step 0</h2><p class="sign-en">INTERCHANGE · STEP 0</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M200 860 H1720" /><circle class="pop" style="--d:.7s" cx="200" cy="860" r="34" fill="#fff" stroke="var(--l1)" stroke-width="12"/><text class="t-lab" x="200" y="940" text-anchor="middle" style="fill:var(--l1);font-size:32px">路由</text><text class="t-mono" x="200" y="800" text-anchor="middle" style="fill:var(--l1)">你在這裡</text><circle class="pop" style="--d:.5s" cx="580" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="580" y="935" text-anchor="middle" >架構影響</text><circle class="pop" style="--d:.5s" cx="960" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="960" y="935" text-anchor="middle" >審查</text><circle class="pop" style="--d:.5s" cx="1340" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1340" y="935" text-anchor="middle" >大功能</text><circle class="pop" style="--d:.5s" cx="1720" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1720" y="935" text-anchor="middle" >上手</text></svg>
+</section>
+<section class="slide " style="--sec:var(--l1)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:84px">Step 0：八站，<span class="amber">只有一站要你</span></h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l1);--d:0.3s;stroke-width:12px" d="M150 560 H1770" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:0.6s" cx="200" cy="560" r="20"/><text class="t-mono" x="200" y="508" text-anchor="middle" >01</text><text class="t-lab" x="200" y="640" text-anchor="middle" style="font-size:30px">查既有功能</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:0.7s" cx="417" cy="560" r="20"/><text class="t-mono" x="417" y="508" text-anchor="middle" >02</text><text class="t-lab" x="417" y="640" text-anchor="middle" style="font-size:30px">判斷情境</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:0.8s" cx="634" cy="560" r="20"/><text class="t-mono" x="634" y="508" text-anchor="middle" >03</text><text class="t-lab" x="634" y="640" text-anchor="middle" style="font-size:30px">判斷內容軸</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:0.9s" cx="851" cy="560" r="20"/><text class="t-mono" x="851" y="508" text-anchor="middle" >04</text><text class="t-lab" x="851" y="640" text-anchor="middle" style="font-size:30px">檢查前置設定</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:1.0s" cx="1068" cy="560" r="20"/><text class="t-mono" x="1068" y="508" text-anchor="middle" >05</text><text class="t-lab" x="1068" y="640" text-anchor="middle" style="font-size:30px">選工具與審查</text><circle class="stn pop" style="stroke:var(--l3);stroke-width:7px;--d:1.1s" cx="1285" cy="560" r="20"/><text class="t-mono" x="1285" y="508" text-anchor="middle" >06</text><text class="t-lab" x="1285" y="640" text-anchor="middle" style="font-size:30px">檢查架構影響</text><g class="pop" style="--d:1.20s"><rect x="1440" y="526" width="124" height="68" rx="34" fill="#fff" stroke="var(--l2)" stroke-width="10"/></g><text class="t-mono" x="1502" y="495" text-anchor="middle" style="fill:var(--l2)">你在這裡</text><text class="t-lab" x="1502" y="650" text-anchor="middle" style="font-size:30px;fill:var(--l2)">確認後開始</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:1.3s" cx="1719" cy="560" r="20"/><text class="t-mono" x="1719" y="508" text-anchor="middle" >08</text><text class="t-lab" x="1719" y="640" text-anchor="middle" style="font-size:30px">執行或交棒</text></svg>
+<p class="lead reveal" style="top:760px;--d:1.2s"><b>前六站 AI 自己查</b>；第七站停下來，等你選「照這組跑」。</p>
+<p class="foot reveal" style="top:830px;--d:1.3s">第八站才開始執行，或交棒給該情境的 skill。</p>
+</section>
+<section class="slide " style="--sec:var(--l1)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:84px">確認畫面長這樣</h2>
+<span class="abs tag reveal muted" style="left:800px;top:186px;--d:.1s">示意</span>
+<div class="abs reveal" style="left:110px;top:320px;width:600px;border:5px solid var(--ink);border-radius:22px;background:var(--card);padding:26px 30px;font:700 28px/1.55 var(--mono);--d:.15s">
+  <span class="muted">你：</span><br>/ios-dev 在設定頁新增匯出功能，沿用現有資料來源</div>
+<ul class="abs reveal" style="left:110px;top:620px;width:600px;list-style:none;font:700 30px/1.5 var(--cjk);--d:.35s">
+  <li style="display:flex;gap:16px;margin-bottom:22px"><span style="color:var(--l1)">●</span>一題選項式提問，不是一串問答</li>
+  <li style="display:flex;gap:16px;margin-bottom:22px"><span style="color:var(--l3)">●</span>先講架構結論，再談實作</li>
+  <li style="display:flex;gap:16px"><span style="color:var(--l2)">●</span>答案會影響風險的題目還沒問，輕重就寫「待定」</li>
+</ul>
+<div class="term-card reveal" style="left:780px;top:255px;width:1030px;--d:.25s">
+  <p class="c" style="font-size:20px;margin-bottom:14px">● ● ●　Step 0 · 確認畫面</p>
+  <div style="display:grid;grid-template-columns:170px 1fr;row-gap:6px"><span class="k">情境</span><span>小功能（內容＝兩者）</span><span class="k">載入</span><span>swift-concurrency<br>swiftui-specialist、swiftui-ui-patterns</span><span class="k">Phase 3</span><span>architecture-auditor（<span class="amber">待定：預判輕</span>）</span><span class="k">審查路線</span><span>B 純 agent（預設）</span><span class="k">架構結論</span><span>直接擴充：沿用既有資料來源</span><span class="k">交棒</span><span>留在 /ios-dev Step 1</span><span class="k">會問你</span><span>匯出的檔案要存在哪裡？</span></div>
+  <div style="border-top:2px dashed #4a4741;margin:22px 0 18px"></div>
+  <p><span class="amber">1. 照這組跑（Recommended）</span><br>2. 照這組跑，加 Codex 審核<br>3. 我要調整</p>
+</div>
+</section>
+<section class="slide " style="--sec:var(--l1)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="top:128px;font-size:72px">七條路線，各有各的站</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l1);--d:0.3s;stroke-width:11px" d="M470 335 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="560" cy="335" r="13"/><text class="t-sm" x="560" y="307" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">釐清需求</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="953" cy="335" r="13"/><text class="t-sm" x="953" y="307" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">架構與測試規劃</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="1346" cy="335" r="13"/><text class="t-sm" x="1346" y="307" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">phase-workflow</text><circle class="term pop" style="stroke:var(--l1);--d:1.00s" cx="1740" cy="335" r="15"/><text class="t-sm" x="1740" y="307" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">切 ticket</text><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.37s;stroke-width:11px" d="M470 440 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.97s" cx="560" cy="440" r="13"/><text class="t-sm" x="560" y="412" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">確認需求</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.97s" cx="953" cy="440" r="13"/><text class="t-sm" x="953" y="412" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">架構影響</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.97s" cx="1346" cy="440" r="13"/><text class="t-sm" x="1346" y="412" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">短計畫</text><circle class="term pop" style="stroke:var(--l2);--d:1.07s" cx="1740" cy="440" r="15"/><text class="t-sm" x="1740" y="412" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">實作</text><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.44s;stroke-width:11px" d="M470 545 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.04s" cx="560" cy="545" r="13"/><text class="t-sm" x="560" y="517" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">檢查狀態來源</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.04s" cx="953" cy="545" r="13"/><text class="t-sm" x="953" y="517" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">實作</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.04s" cx="1346" cy="545" r="13"/><text class="t-sm" x="1346" y="517" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">ios-polish</text><circle class="term pop" style="stroke:var(--l3);--d:1.14s" cx="1740" cy="545" r="15"/><text class="t-sm" x="1740" y="517" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">前後 Preview</text><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.51s;stroke-width:11px" d="M470 650 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.11s" cx="560" cy="650" r="13"/><text class="t-sm" x="560" y="622" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">收集症狀</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.11s" cx="953" cy="650" r="13"/><text class="t-sm" x="953" y="622" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">找根因</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.11s" cx="1346" cy="650" r="13"/><text class="t-sm" x="1346" y="622" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">修正</text><circle class="term pop" style="stroke:var(--l4);--d:1.21s" cx="1740" cy="650" r="15"/><text class="t-sm" x="1740" y="622" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">重現驗證</text><path class="ln" pathLength="1" style="stroke:var(--l5);--d:0.5800000000000001s;stroke-width:11px" d="M470 755 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.1800000000000002s" cx="560" cy="755" r="13"/><text class="t-sm" x="560" y="727" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">建立基線</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.1800000000000002s" cx="1150" cy="755" r="13"/><text class="t-sm" x="1150" y="727" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">修改</text><circle class="term pop" style="stroke:var(--l5);--d:1.28s" cx="1740" cy="755" r="15"/><text class="t-sm" x="1740" y="727" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">同一把尺再量</text><path class="ln" pathLength="1" style="stroke:var(--l6);--d:0.65s;stroke-width:11px" d="M470 860 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.25s" cx="560" cy="860" r="13"/><text class="t-sm" x="560" y="832" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">現況基線</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.25s" cx="953" cy="860" r="13"/><text class="t-sm" x="953" y="832" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">責任邊界</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.25s" cx="1346" cy="860" r="13"/><text class="t-sm" x="1346" y="832" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">分段修改</text><circle class="term pop" style="stroke:var(--l6);--d:1.35s" cx="1740" cy="860" r="15"/><text class="t-sm" x="1740" y="832" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">前後對比</text><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.72s;stroke-width:11px" d="M470 965 H1760" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.32s" cx="560" cy="965" r="13"/><text class="t-sm" x="560" y="937" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">讀契約</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.32s" cx="855" cy="965" r="13"/><text class="t-sm" x="855" y="937" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">本張計畫</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.32s" cx="1150" cy="965" r="13"/><text class="t-sm" x="1150" y="937" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">實作</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.32s" cx="1445" cy="965" r="13"/><text class="t-sm" x="1445" y="937" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">審查</text><circle class="term pop" style="stroke:var(--l7);--d:1.42s" cx="1740" cy="965" r="15"/><text class="t-sm" x="1740" y="937" text-anchor="middle" style="font-size:25px;fill:var(--ink2);font-weight:700">回寫狀態</text></svg>
+<div class="abs reveal" style="left:110px;top:312px;height:46px;display:flex;align-items:center;gap:16px;--d:0.20s"><span class="badge" style="background:var(--l1)">1</span><b style="font:900 32px/1 var(--cjk)">新專案／大功能</b></div><div class="abs reveal" style="left:110px;top:417px;height:46px;display:flex;align-items:center;gap:16px;--d:0.27s"><span class="badge" style="background:var(--l2)">2</span><b style="font:900 32px/1 var(--cjk)">小功能</b></div><div class="abs reveal" style="left:110px;top:522px;height:46px;display:flex;align-items:center;gap:16px;--d:0.34s"><span class="badge" style="background:var(--l3)">3</span><b style="font:900 32px/1 var(--cjk)">純畫面</b></div><div class="abs reveal" style="left:110px;top:627px;height:46px;display:flex;align-items:center;gap:16px;--d:0.41s"><span class="badge" style="background:var(--l4)">4</span><b style="font:900 32px/1 var(--cjk)">修正</b></div><div class="abs reveal" style="left:110px;top:732px;height:46px;display:flex;align-items:center;gap:16px;--d:0.48s"><span class="badge" style="background:var(--l5)">5</span><b style="font:900 32px/1 var(--cjk)">優化</b></div><div class="abs reveal" style="left:110px;top:837px;height:46px;display:flex;align-items:center;gap:16px;--d:0.55s"><span class="badge" style="background:var(--l6)">6</span><b style="font:900 32px/1 var(--cjk)">重構</b></div><div class="abs reveal" style="left:110px;top:942px;height:46px;display:flex;align-items:center;gap:16px;--d:0.62s"><span class="badge" style="background:var(--l7)">7</span><b style="font:900 32px/1 var(--cjk)">接 ticket</b></div>
+</section>
+<section class="slide " style="--sec:var(--l1);--acc:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:220px">路線 3 · 純畫面</p>
+<h2 class="big reveal" style="top:280px;--d:.1s">只改間距與樣式，<br>才叫<span class="hl">純畫面</span>。</h2>
+<p class="lead reveal" style="top:665px;width:1520px;--d:.25s">碰到 state、導航、驗證、持久化或 async，就改走小功能或中型路線。<br>純畫面也要答一題：<b>會不會多出第二份真相或互斥旗標？</b></p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.35s;stroke-width:16px" d="M-20 940 H1940" /><circle class="stn pop" style="stroke:var(--l3);stroke-width:7px;--d:0.9s" cx="420" cy="940" r="18"/><circle class="stn pop" style="stroke:var(--l3);stroke-width:7px;--d:1.0s" cx="860" cy="940" r="18"/><circle class="stn pop" style="stroke:var(--l3);stroke-width:7px;--d:1.1s" cx="1300" cy="940" r="18"/></svg>
+<div class="abs reveal" style="left:1640px;top:906px;display:flex;align-items:center;gap:16px;--d:.6s">
+  <span class="badge" style="background:var(--l3);width:68px;height:68px;font-size:40px;line-height:70px;border-radius:14px">3</span></div>
+</section>
+<section class="slide " style="--sec:var(--l1);--acc:var(--l4)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:220px">路線 4 · 修正</p>
+<h2 class="big reveal" style="top:280px;--d:.1s">沒找到根因，<br><span class="hl">不准修 code</span>。</h2>
+<p class="lead reveal" style="top:665px;width:1520px;--d:.25s">ios-investigate 五階段：收集症狀 → 模式比對 → 假設驗證 → 修復 → 驗證回報。<br><b>根因未知或高風險，強制加 Codex 審查。</b></p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.35s;stroke-width:16px" d="M-20 940 H1940" /><circle class="stn pop" style="stroke:var(--l4);stroke-width:7px;--d:0.9s" cx="420" cy="940" r="18"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:7px;--d:1.0s" cx="860" cy="940" r="18"/><circle class="stn pop" style="stroke:var(--l4);stroke-width:7px;--d:1.1s" cx="1300" cy="940" r="18"/></svg>
+<div class="abs reveal" style="left:1640px;top:906px;display:flex;align-items:center;gap:16px;--d:.6s">
+  <span class="badge" style="background:var(--l4);width:68px;height:68px;font-size:40px;line-height:70px;border-radius:14px">4</span></div>
+</section>
+<section class="slide " style="--sec:var(--l1);--acc:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>路由</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:220px">路線 5 · 優化</p>
+<h2 class="big reveal" style="top:280px;--d:.1s">沒有數字，<br><span class="hl">不動 code</span>。</h2>
+<p class="lead reveal" style="top:665px;width:1520px;--d:.25s">改前用 perf-auditor、Instruments trace 或線上效能數據量出基線；<br><b>改後用同一把尺再量一次，寫進 PR。</b></p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l5);--d:0.35s;stroke-width:16px" d="M-20 940 H1940" /><circle class="stn pop" style="stroke:var(--l5);stroke-width:7px;--d:0.9s" cx="420" cy="940" r="18"/><circle class="stn pop" style="stroke:var(--l5);stroke-width:7px;--d:1.0s" cx="860" cy="940" r="18"/><circle class="stn pop" style="stroke:var(--l5);stroke-width:7px;--d:1.1s" cx="1300" cy="940" r="18"/></svg>
+<div class="abs reveal" style="left:1640px;top:906px;display:flex;align-items:center;gap:16px;--d:.6s">
+  <span class="badge" style="background:var(--l5);width:68px;height:68px;font-size:40px;line-height:70px;border-radius:14px">5</span></div>
+</section>
+<section class="slide " style="--sec:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>架構影響</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 02 / 05</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">2</span>
+  <div><h2 class="sign-name">開工前：架構影響</h2><p class="sign-en">BEFORE YOU BUILD</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M200 860 H1720" /><circle class="pop" style="--d:.5s" cx="200" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="200" y="935" text-anchor="middle" >路由</text><circle class="pop" style="--d:.7s" cx="580" cy="860" r="34" fill="#fff" stroke="var(--l3)" stroke-width="12"/><text class="t-lab" x="580" y="940" text-anchor="middle" style="fill:var(--l3);font-size:32px">架構影響</text><text class="t-mono" x="580" y="800" text-anchor="middle" style="fill:var(--l3)">你在這裡</text><circle class="pop" style="--d:.5s" cx="960" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="960" y="935" text-anchor="middle" >審查</text><circle class="pop" style="--d:.5s" cx="1340" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1340" y="935" text-anchor="middle" >大功能</text><circle class="pop" style="--d:.5s" cx="1720" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1720" y="935" text-anchor="middle" >上手</text></svg>
+</section>
+<section class="slide " style="--sec:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>架構影響</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:96px">開工前，先答五題</h2>
+<p class="sub reveal" style="top:285px;--d:.1s">任何會改變行為的任務都要答；篇幅隨規模伸縮。</p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.3s;stroke-width:12px" d="M110 560 H1810" /><g class="pop" style="--d:0.60s"><circle cx="260" cy="560" r="48" fill="#fff" stroke="var(--l3)" stroke-width="10"/><text class="t-num" x="260" y="576" text-anchor="middle" >1</text></g><g class="pop" style="--d:0.72s"><circle cx="610" cy="560" r="48" fill="#fff" stroke="var(--l3)" stroke-width="10"/><text class="t-num" x="610" y="576" text-anchor="middle" >2</text></g><g class="pop" style="--d:0.84s"><circle cx="960" cy="560" r="48" fill="#fff" stroke="var(--l3)" stroke-width="10"/><text class="t-num" x="960" y="576" text-anchor="middle" >3</text></g><g class="pop" style="--d:0.96s"><circle cx="1310" cy="560" r="48" fill="#fff" stroke="var(--l3)" stroke-width="10"/><text class="t-num" x="1310" y="576" text-anchor="middle" >4</text></g><g class="pop" style="--d:1.08s"><circle cx="1660" cy="560" r="48" fill="#fff" stroke="var(--l3)" stroke-width="10"/><text class="t-num" x="1660" y="576" text-anchor="middle" >5</text></g></svg>
+<p class="abs reveal" style="left:90px;top:640px;width:340px;text-align:center;font:800 32px/1.5 var(--cjk);--d:0.80s">現有行為與狀態，<br>誰負責？</p><p class="abs reveal" style="left:440px;top:640px;width:340px;text-align:center;font:800 32px/1.5 var(--cjk);--d:0.92s">新需求該接到<br>哪個 owner？</p><p class="abs reveal" style="left:790px;top:640px;width:340px;text-align:center;font:800 32px/1.5 var(--cjk);--d:1.04s">會不會多出<br>第二份真相？</p><p class="abs reveal" style="left:1140px;top:640px;width:340px;text-align:center;font:800 32px/1.5 var(--cjk);--d:1.16s">有新的非同步工作？<br>生命週期歸誰？</p><p class="abs reveal" style="left:1490px;top:640px;width:340px;text-align:center;font:800 32px/1.5 var(--cjk);--d:1.28s">直接擴充、局部整理，<br>還是模組邊界？</p>
+<p class="foot reveal" style="top:900px;--d:1.5s">第 2 題接不到 owner，就是訊號：<b>可能缺一個 owner。</b></p>
+</section>
+<section class="slide " style="--sec:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>架構影響</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:80px">答完，只會落在三條路之一</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.5s;stroke-width:12px" d="M290 620 H420 L610 430 H800" /><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.6s;stroke-width:12px" d="M290 640 H800" /><path class="ln" pathLength="1" style="stroke:var(--l1);--d:0.7s;stroke-width:12px" d="M290 660 H420 L610 850 H800" /><circle class="term pop" style="stroke:var(--l4);--d:1.2s" cx="800" cy="430" r="20"/><circle class="term pop" style="stroke:var(--l2);--d:1.2s" cx="800" cy="640" r="20"/><circle class="term pop" style="stroke:var(--l1);--d:1.2s" cx="800" cy="850" r="20"/><g class="pop" style="--d:.3s"><rect class="hub" x="110" y="585" width="180" height="110" rx="40"/><text class="" x="200" y="652" text-anchor="middle" style="font:900 38px var(--cjk);fill:var(--ink)">五問</text></g></svg>
+<div class="card reveal" style="left:860px;top:338px;width:950px;height:184px;padding:24px 36px;border-left:20px solid var(--l4);--d:1.00s"><p style="font:900 40px/1.2 var(--cjk);color:var(--l4)">直接擴充</p><p style="font:500 25px/1.5 var(--cjk);color:var(--muted);margin-top:6px">owner 清楚、沒有新的真相來源、沒有新的 async</p><p style="font:800 29px/1.45 var(--cjk);margin-top:2px">→ 照現有契約加，五問答案寫一句進 plan</p></div><div class="card reveal" style="left:860px;top:548px;width:950px;height:184px;padding:24px 36px;border-left:20px solid var(--l2);--d:1.12s"><p style="font:900 40px/1.2 var(--cjk);color:var(--l2)">局部整理</p><p style="font:500 25px/1.5 var(--cjk);color:var(--muted);margin-top:6px">owner 模糊，或會多出第二個互斥旗標</p><p style="font:800 29px/1.45 var(--cjk);margin-top:2px">→ 只整理這次碰到的責任區，再加功能</p></div><div class="card reveal" style="left:860px;top:758px;width:950px;height:184px;padding:24px 36px;border-left:20px solid var(--l1);--d:1.24s"><p style="font:900 40px/1.2 var(--cjk);color:var(--l1)">模組邊界</p><p style="font:500 25px/1.5 var(--cjk);color:var(--muted);margin-top:6px">新模組／多畫面流程／多個 async 協調／得先拆 View</p><p style="font:800 29px/1.45 var(--cjk);margin-top:2px">→ 交 phase-workflow 中型規劃</p></div>
+<p class="foot reveal" style="top:975px;font-size:27px;--d:1.5s"><b>護欄兩邊都要守：</b>不因小功能全面重寫；也不拿「最小 diff」當理由繼續堆。</p>
+</section>
+<section class="slide " style="--sec:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>架構影響</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:200px">兩軸分流 · 工作量 × 責任邊界</p>
+<h2 class="big reveal" style="top:255px;font-size:130px;--d:.1s">ticket 數，<br><span class="hl">不決定</span>要不要規劃。</h2>
+<div class="card reveal" style="left:110px;top:650px;width:820px;height:200px;--d:.35s">
+  <p style="font:900 46px/1.2 var(--latin)">2 張 ticket<span style="font:700 32px var(--cjk);margin-left:14px">的新模組</span></p>
+  <p style="font:900 36px/1.4 var(--cjk);color:var(--l1);margin-top:18px">→ 照樣要中型規劃</p></div>
+<div class="card reveal" style="left:990px;top:650px;width:820px;height:200px;--d:.5s">
+  <p style="font:900 46px/1.2 var(--latin)">10 張 ticket<span style="font:700 32px var(--cjk);margin-left:14px">沿既有清楚契約</span></p>
+  <p style="font:900 36px/1.4 var(--cjk);color:var(--l4);margin-top:18px">→ 不必進中型</p></div>
+<p class="foot reveal" style="top:905px;font-size:30px;--d:.7s"><b>工作量</b>決定產幾份文件；<b>責任邊界</b>決定開工前要哪些架構決策。</p>
+</section>
+<section class="slide " style="--sec:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>架構影響</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:84px">新的非同步工作，先填六格</h2>
+<div class="abs reveal" style="left:110px;top:330px;width:270px;--d:0.15s"><div style="height:170px;border:5px solid var(--ink);border-radius:22px;background:var(--ink);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px"><b style="font:900 38px/1 var(--cjk)">工作</b><small class="mono" style="font-size:18px;letter-spacing:.1em;opacity:.65;font-weight:700">TASK</small></div><p style="font:600 25px/1.55 var(--cjk);color:var(--ink2);margin-top:18px;text-align:center"></p></div><div class="abs reveal" style="left:392px;top:330px;width:270px;--d:0.23s"><div style="height:170px;border:5px solid var(--ink);border-radius:22px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px"><b style="font:900 38px/1 var(--cjk)">持有者</b><small class="mono" style="font-size:18px;letter-spacing:.1em;opacity:.65;font-weight:700">OWNER</small></div><p style="font:600 25px/1.55 var(--cjk);color:var(--ink2);margin-top:18px;text-align:center">誰啟動、誰持有</p></div><div class="abs reveal" style="left:674px;top:330px;width:270px;--d:0.31s"><div style="height:170px;border:5px solid var(--ink);border-radius:22px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px"><b style="font:900 38px/1 var(--cjk)">生命週期</b><small class="mono" style="font-size:18px;letter-spacing:.1em;opacity:.65;font-weight:700">LIFETIME</small></div><p style="font:600 25px/1.55 var(--cjk);color:var(--ink2);margin-top:18px;text-align:center">畫面・功能<br>session・App</p></div><div class="abs reveal" style="left:956px;top:330px;width:270px;--d:0.39s"><div style="height:170px;border:5px solid var(--ink);border-radius:22px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px"><b style="font:900 38px/1 var(--cjk)">結束與清理</b><small class="mono" style="font-size:18px;letter-spacing:.1em;opacity:.65;font-weight:700">CLEANUP</small></div><p style="font:600 25px/1.55 var(--cjk);color:var(--ink2);margin-top:18px;text-align:center">誰 cancel、何時 cancel</p></div><div class="abs reveal" style="left:1238px;top:330px;width:270px;--d:0.47s"><div style="height:170px;border:5px solid var(--ink);border-radius:22px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px"><b style="font:900 38px/1 var(--cjk)">重入策略</b><small class="mono" style="font-size:18px;letter-spacing:.1em;opacity:.65;font-weight:700">RE-ENTRY</small></div><p style="font:600 25px/1.55 var(--cjk);color:var(--ink2);margin-top:18px;text-align:center">忽略新的・取代舊的<br>排隊・受控平行</p></div><div class="abs reveal" style="left:1520px;top:330px;width:270px;--d:0.55s"><div style="height:170px;border:5px solid var(--ink);border-radius:22px;background:var(--card);color:var(--ink);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px"><b style="font:900 38px/1 var(--cjk)">舊結果失效</b><small class="mono" style="font-size:18px;letter-spacing:.1em;opacity:.65;font-weight:700">STALE</small></div><p style="font:600 25px/1.55 var(--cjk);color:var(--ink2);margin-top:18px;text-align:center">generation 計數<br>id 比對・只能丟棄</p></div>
+<h3 class="abs reveal" style="left:110px;top:720px;font:900 60px/1.35 var(--cjk);--d:.8s">判準是六格<span class="hl">填不填得出來</span>，<br>不是 Task 的數量或放在哪一層。</h3>
+<p class="foot reveal" style="top:930px;--d:1s">優先用 structured concurrency；需要 handle 才存 Task，存了就寫清楚誰 cancel。</p>
+</section>
+<section class="slide " style="--sec:var(--l3)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>架構影響</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:110px">契約，<span class="hl">不能</span>遷就 code。</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.5s;stroke-width:12px" d="M580 645 H700 L840 505 H1000" /><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.6s;stroke-width:12px" d="M580 645 H700 L840 785 H1000" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.9s" cx="700" cy="645" r="18"/><circle class="term pop" style="stroke:var(--l4);--d:1.1s" cx="1000" cy="505" r="18"/><circle class="term pop" style="stroke:var(--l2);--d:1.1s" cx="1000" cy="785" r="18"/></svg>
+<div class="card reveal" style="left:110px;top:560px;width:470px;height:170px;border-style:dashed;display:flex;align-items:center;--d:.2s">
+  <p style="font:800 32px/1.5 var(--cjk);margin:0;color:var(--ink)">實作中多出計畫外的<br>旗標、Task 或依賴</p></div>
+<div class="card reveal" style="left:1040px;top:420px;width:770px;height:170px;border-left:20px solid var(--l4);--d:1.2s">
+  <p style="font:900 40px/1.2 var(--cjk);color:var(--l4)">實作違反了契約</p>
+  <p style="font:800 30px/1.5 var(--cjk);margin-top:14px;color:var(--ink)">→ 修實作，重跑驗證</p></div>
+<div class="card reveal" style="left:1040px;top:700px;width:770px;height:170px;border-left:20px solid var(--l2);--d:1.3s">
+  <p style="font:900 40px/1.2 var(--cjk);color:var(--l2)">契約確實不適用</p>
+  <p style="font:800 30px/1.5 var(--cjk);margin-top:14px;color:var(--ink)">→ 寫理由、重跑五問、更新契約與測試</p></div>
+<p class="foot reveal" style="top:950px;font-size:30px;--d:1.5s"><b>判不出來是哪一種？</b>停下來問人，不預設走第二條。</p>
+</section>
+<section class="slide " style="--sec:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>審查</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 03 / 05</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">3</span>
+  <div><h2 class="sign-name">完成後：審查</h2><p class="sign-en">REVIEW & VERIFY</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M200 860 H1720" /><circle class="pop" style="--d:.5s" cx="200" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="200" y="935" text-anchor="middle" >路由</text><circle class="pop" style="--d:.5s" cx="580" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="580" y="935" text-anchor="middle" >架構影響</text><circle class="pop" style="--d:.7s" cx="960" cy="860" r="34" fill="#fff" stroke="var(--l5)" stroke-width="12"/><text class="t-lab" x="960" y="940" text-anchor="middle" style="fill:var(--l5);font-size:32px">審查</text><text class="t-mono" x="960" y="800" text-anchor="middle" style="fill:var(--l5)">你在這裡</text><circle class="pop" style="--d:.5s" cx="1340" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1340" y="935" text-anchor="middle" >大功能</text><circle class="pop" style="--d:.5s" cx="1720" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1720" y="935" text-anchor="middle" >上手</text></svg>
+</section>
+<section class="slide " style="--sec:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>審查</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:96px">三個判斷，分開決定</h2>
+<div class="abs reveal" style="left:110px;top:325px;width:1700px;height:170px;border-top:3px solid var(--rule);--d:0.20s"><div style="position:absolute;left:0;top:28px;display:flex;gap:24px;align-items:center"><span style="width:84px;height:84px;border-radius:50%;background:var(--l3);color:#fff;font:900 46px/88px var(--latin);text-align:center">1</span><div><p style="font:900 42px/1.2 var(--cjk)">架構影響</p><p style="font:500 26px/1.4 var(--cjk);color:var(--muted)">開工前判斷</p></div></div><div style="position:absolute;left:490px;top:28px;width:390px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)">直接擴充</div><div style="position:absolute;left:900px;top:28px;width:390px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)">局部整理</div><div style="position:absolute;left:1310px;top:28px;width:390px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)">模組邊界</div></div><div class="abs reveal" style="left:110px;top:530px;width:1700px;height:170px;border-top:3px solid var(--rule);--d:0.35s"><div style="position:absolute;left:0;top:28px;display:flex;gap:24px;align-items:center"><span style="width:84px;height:84px;border-radius:50%;background:var(--l1);color:#fff;font:900 46px/88px var(--latin);text-align:center">2</span><div><p style="font:900 42px/1.2 var(--cjk)">審查強度</p><p style="font:500 26px/1.4 var(--cjk);color:var(--muted)">依風險判斷</p></div></div><div style="position:absolute;left:490px;top:28px;width:595px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)">輕</div><div style="position:absolute;left:1105px;top:28px;width:595px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)">重</div></div><div class="abs reveal" style="left:110px;top:735px;width:1700px;height:170px;border-top:3px solid var(--rule);--d:0.50s"><div style="position:absolute;left:0;top:28px;display:flex;gap:24px;align-items:center"><span style="width:84px;height:84px;border-radius:50%;background:var(--l5);color:#fff;font:900 46px/88px var(--latin);text-align:center">3</span><div><p style="font:900 42px/1.2 var(--cjk)">審查路線</p><p style="font:500 26px/1.4 var(--cjk);color:var(--muted)">選擇審查方式</p></div></div><div style="position:absolute;left:490px;top:28px;width:390px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)"><b style="font:900 44px/1 var(--latin);margin-right:12px;color:var(--l5)">A</b> 共識審查</div><div style="position:absolute;left:900px;top:28px;width:390px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)"><b style="font:900 44px/1 var(--latin);margin-right:12px;color:var(--l5)">B</b> 純 agent</div><div style="position:absolute;left:1310px;top:28px;width:390px;height:112px;border:5px solid var(--ink);border-radius:22px;background:var(--card);display:flex;align-items:center;justify-content:center;font:800 36px/1 var(--cjk)"><b style="font:900 44px/1 var(--latin);margin-right:12px;color:var(--l5)">C</b> 輕量</div></div>
+<p class="foot reveal" style="top:950px;--d:.8s">三個判斷沒有一對一對應：<b>小功能也可能要重審查</b>；ticket 數不決定架構路線。</p>
+</section>
+<section class="slide " style="--sec:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>審查</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:96px">輕或重？看五個條件</h2>
+<div class="card reveal" style="left:110px;top:320px;width:1040px;height:440px;padding:40px 48px;--d:.2s">
+  <p style="font:900 42px/1 var(--cjk)">風險三條 <span class="tag" style="color:var(--l1);margin-left:14px;vertical-align:middle">所有情境</span></p>
+  <div style="margin-top:34px;display:flex;flex-direction:column;gap:26px;font:800 32px/1.45 var(--cjk)">
+    <div style="display:flex;gap:22px"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:7px solid var(--l4);background:#fff;margin-top:8px"></span><span>不碰 concurrency、state machine、<br>持久化、網路協定或 migration</span></div>
+    <div style="display:flex;gap:22px"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:7px solid var(--l4);background:#fff;margin-top:8px"></span><span>不改公開契約</span></div>
+    <div style="display:flex;gap:22px"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:7px solid var(--l4);background:#fff;margin-top:8px"></span><span>這次改動寫得出可重現的測試</span></div></div></div>
+<div class="card reveal" style="left:1190px;top:320px;width:620px;height:440px;padding:40px 48px;--d:.35s">
+  <p style="font:900 42px/1 var(--cjk)">規模兩條</p>
+  <p style="margin-top:14px"><span class="tag" style="color:var(--l7)">修正・接 ticket</span></p>
+  <div style="margin-top:30px;display:flex;flex-direction:column;gap:26px;font:800 32px/1.45 var(--cjk)">
+    <div style="display:flex;gap:22px"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:7px solid var(--l4);background:#fff;margin-top:8px"></span><span>範圍單一且清楚</span></div>
+    <div style="display:flex;gap:22px"><span style="flex:none;width:30px;height:30px;border-radius:50%;border:7px solid var(--l4);background:#fff;margin-top:8px"></span><span>production diff<br>≤ 50 行</span></div></div></div>
+<h3 class="abs reveal" style="left:110px;top:830px;font:900 64px/1.3 var(--cjk);--d:.6s">任一風險不符 → <span class="red">重</span>。做完再判一次。</h3>
+</section>
+<section class="slide " style="--sec:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>審查</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="top:140px;font-size:84px">三條審查路線，<span class="amber">終點都是人</span></h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l1);--d:0.3s;stroke-width:12px" d="M580 400 H1300 L1480 580 H1560" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="650" cy="400" r="14"/><text class="t-sm" x="650" y="370" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">specialist ×3</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="840" cy="400" r="14"/><text class="t-sm" x="840" y="448" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">consensus-review</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="1030" cy="400" r="14"/><text class="t-sm" x="1030" y="370" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">Codex 審查</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:0.9s" cx="1190" cy="400" r="14"/><text class="t-sm" x="1190" y="448" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">修復＋re-review</text><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.42s;stroke-width:12px" d="M580 620 H1560" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.0s" cx="650" cy="620" r="14"/><text class="t-sm" x="650" y="590" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">specialist＋auditor</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.0s" cx="860" cy="620" r="14"/><text class="t-sm" x="860" y="668" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">主 session 統一修復</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.0s" cx="1080" cy="620" r="14"/><text class="t-sm" x="1080" y="590" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">ios-polish</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.0s" cx="1280" cy="620" r="14"/><text class="t-sm" x="1280" y="668" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">verification</text><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.54s;stroke-width:12px" d="M580 840 H1300 L1480 660 H1560" /><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.1s" cx="700" cy="840" r="14"/><text class="t-sm" x="700" y="810" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">ios-review 兩輪</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:5px;--d:1.1s" cx="1000" cy="840" r="14"/><text class="t-sm" x="1000" y="810" text-anchor="middle" style="font-size:24px;fill:var(--ink2);font-weight:700">verification</text><g class="pop" style="--d:1.3s"><rect class="hub" x="1560" y="520" width="250" height="200" rx="50"/><text class="" x="1685" y="608" text-anchor="middle" style="font:900 42px var(--cjk);fill:var(--ink)">人工</text><text class="" x="1685" y="655" text-anchor="middle" style="font:800 30px var(--latin);fill:var(--ink)">Code Review</text></g></svg>
+<div class="abs reveal" style="left:110px;top:350px;display:flex;gap:22px;align-items:center;--d:0.20s"><span class="badge" style="background:var(--l1);width:84px;height:84px;font-size:52px;line-height:88px;border-radius:16px">A</span><div style="width:330px"><p style="font:900 38px/1.2 var(--cjk)">共識</p><p style="font:500 22px/1.45 var(--cjk);color:var(--muted);margin-top:4px">選「加 Codex 審核」<br>複雜 Bugfix 強制</p></div></div><div class="abs reveal" style="left:110px;top:570px;display:flex;gap:22px;align-items:center;--d:0.32s"><span class="badge" style="background:var(--l3);width:84px;height:84px;font-size:52px;line-height:88px;border-radius:16px">B</span><div style="width:330px"><p style="font:900 38px/1.2 var(--cjk)">純 agent</p><p style="font:500 22px/1.45 var(--cjk);color:var(--muted);margin-top:4px">預設路線</p></div></div><div class="abs reveal" style="left:110px;top:790px;display:flex;gap:22px;align-items:center;--d:0.44s"><span class="badge" style="background:var(--l4);width:84px;height:84px;font-size:52px;line-height:88px;border-radius:16px">C</span><div style="width:330px"><p style="font:900 38px/1.2 var(--cjk)">輕量</p><p style="font:500 22px/1.45 var(--cjk);color:var(--muted);margin-top:4px">≤50 行＋風險三條全綠<br>不可放寬</p></div></div>
+<p class="foot reveal" style="top:965px;font-size:26px;--d:1.5s">B、C 的 PR 描述要標明路線，以及「未經 Codex 交叉驗證」。</p>
+</section>
+<section class="slide " style="--sec:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>審查</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:84px">9 個審查 agent，按需上車</h2>
+<p class="sub reveal" style="top:268px;--d:.1s">Agent <b>只回報</b>；程式碼由主 session <b>統一修一次</b>。</p>
+<div class="abs reveal" style="left:110px;top:350px;width:530px;height:560px;border:5px solid var(--ink);border-radius:28px;background:var(--card);overflow:hidden;--d:0.20s"><div style="background:var(--l7);color:#fff;padding:22px 34px;font:900 34px/1.2 var(--cjk)">介面與體驗</div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">swiftui-reviewer</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">SwiftUI 正確性、state 與 API 用法</p></div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">ux-critique</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">視覺層級、資訊架構、HIG</p></div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">resilience-auditor</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">空值、錯誤、Dynamic Type、VoiceOver</p></div></div><div class="abs reveal" style="left:700px;top:350px;width:530px;height:560px;border:5px solid var(--ink);border-radius:28px;background:var(--card);overflow:hidden;--d:0.32s"><div style="background:var(--l3);color:#fff;padding:22px 34px;font:900 34px/1.2 var(--cjk)">架構・並行・效能</div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">architecture-auditor</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">View 複雜度、責任邊界、pattern 一致</p></div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">concurrency-auditor</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">isolation、Task ownership、取消</p></div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">perf-auditor</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">重繪、identity、layout 熱點</p></div></div><div class="abs reveal" style="left:1290px;top:350px;width:530px;height:560px;border:5px solid var(--ink);border-radius:28px;background:var(--card);overflow:hidden;--d:0.44s"><div style="background:var(--l6);color:#fff;padding:22px 34px;font:900 34px/1.2 var(--cjk)">專項・需要時才上</div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">trace-analyzer</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">Instruments trace 的 hang／hitch</p></div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">build-analyzer</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">Xcode 設定、編譯熱點、SPM</p></div><div style="padding:30px 34px 0"><p style="font:700 28px/1.3 var(--mono)">store-preflight-auditor</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:6px">送審前 plist、隱私、metadata</p></div></div>
+</section>
+<section class="slide " style="--sec:var(--l5)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>審查</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:205px;color:var(--l2)">終點站 · HUMAN REVIEW</p>
+<h2 class="big reveal" style="top:255px;--d:.1s">最後一站，是<span class="amber">你</span>。</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.3s;stroke-width:12px" d="M110 640 H1810" /><circle class="stn pop" style="stroke:var(--l2);stroke-width:10px;--d:0.7s" cx="400" cy="640" r="30"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:10px;--d:0.82s" cx="960" cy="640" r="30"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:10px;--d:0.94s" cx="1520" cy="640" r="30"/></svg>
+<div class="abs reveal" style="left:140px;top:700px;width:520px;text-align:center;--d:0.90s"><p style="font:900 44px/1.3 var(--cjk)">改了什麼？</p><p style="font:500 27px/1.5 var(--cjk);color:var(--muted);margin-top:8px">diff 有沒有超出說好的範圍</p></div><div class="abs reveal" style="left:700px;top:700px;width:520px;text-align:center;--d:1.02s"><p style="font:900 44px/1.3 var(--cjk)">怎麼驗證？</p><p style="font:500 27px/1.5 var(--cjk);color:var(--muted);margin-top:8px">測試、Preview、量測撐得住宣稱嗎</p></div><div class="abs reveal" style="left:1260px;top:700px;width:520px;text-align:center;--d:1.14s"><p style="font:900 44px/1.3 var(--cjk)">還剩什麼？</p><p style="font:500 27px/1.5 var(--cjk);color:var(--muted);margin-top:8px">findings 修了、駁回、延後，各為什麼</p></div>
+<div class="abs reveal" style="left:110px;top:900px;background:var(--ink);color:#fff;border-radius:999px;padding:20px 40px;font:800 34px/1.2 var(--cjk);--d:1.4s">
+  你核准之前：<span style="color:#ff6a6f">不 commit、不 push、不開 PR。</span></div>
+</section>
+<section class="slide " style="--sec:var(--l7)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>大功能與 ticket</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 04 / 05</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">4</span>
+  <div><h2 class="sign-name">大功能與 ticket</h2><p class="sign-en">LARGE FEATURES & TICKETS</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M200 860 H1720" /><circle class="pop" style="--d:.5s" cx="200" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="200" y="935" text-anchor="middle" >路由</text><circle class="pop" style="--d:.5s" cx="580" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="580" y="935" text-anchor="middle" >架構影響</text><circle class="pop" style="--d:.5s" cx="960" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="960" y="935" text-anchor="middle" >審查</text><circle class="pop" style="--d:.7s" cx="1340" cy="860" r="34" fill="#fff" stroke="var(--l7)" stroke-width="12"/><text class="t-lab" x="1340" y="940" text-anchor="middle" style="fill:var(--l7);font-size:32px">大功能</text><text class="t-mono" x="1340" y="800" text-anchor="middle" style="fill:var(--l7)">你在這裡</text><circle class="pop" style="--d:.5s" cx="1720" cy="860" r="16" fill="#fff" stroke="var(--ink)" stroke-width="6"/><text class="t-sm" x="1720" y="935" text-anchor="middle" >上手</text></svg>
+</section>
+<section class="slide " style="--sec:var(--l7)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>大功能與 ticket</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:76px">大功能：先切 ticket，<br>再一張張<span class="hl">接回來</span></h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.3s;stroke-width:12px" d="M200 480 H700 L800 580 H900" /><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.4s;stroke-width:12px" d="M200 720 H700 L800 620 H900" /><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.9s;stroke-width:12px" d="M1190 600 H1400" /><path class="ln" pathLength="1" style="stroke:var(--ink);--d:1.1s;stroke-width:10px" d="M1400 600 H1460 L1560 500 H1700" /><path class="ln" pathLength="1" style="stroke:var(--ink);--d:1.15s;stroke-width:10px" d="M1400 600 H1700" /><path class="ln" pathLength="1" style="stroke:var(--ink);--d:1.2s;stroke-width:10px" d="M1400 600 H1460 L1560 700 H1700" /><circle class="pop" style="--d:.3s" cx="200" cy="480" r="14" fill="var(--l7)"/><circle class="pop" style="--d:.3s" cx="200" cy="720" r="14" fill="var(--l7)"/><text class="t-lab" x="200" y="440" text-anchor="start" >沒有 PM spec</text><text class="t-lab" x="200" y="780" text-anchor="start" >已有 PM spec</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.7s" cx="460" cy="480" r="18"/><text class="t-sm" x="460" y="530" text-anchor="middle" style="font-weight:700;fill:var(--ink2)">ios-dev Step 1–5</text><text class="t-sm" x="460" y="562" text-anchor="middle" style="font-size:22px">grill・§0 架構形狀</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.8s" cx="460" cy="720" r="18"/><text class="t-sm" x="460" y="680" text-anchor="middle" style="font-weight:700;fill:var(--ink2)">入口 B：rd-spec 人審</text><g class="pop" style="--d:.8s"><rect class="hub" x="900" y="525" width="290" height="150" rx="44"/><text class="" x="1045" y="612" text-anchor="middle" style="font:800 30px var(--mono);fill:var(--ink)">phase-workflow</text></g><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.0s" cx="1400" cy="600" r="18"/><text class="t-mono" x="1400" y="650" text-anchor="middle" >tickets</text><circle class="term pop" style="stroke:var(--l7);--d:1.5s" cx="1700" cy="500" r="16"/><text class="" x="1735" y="510" text-anchor="start" style="font:900 32px var(--latin);fill:var(--ink)">T1</text><circle class="term pop" style="stroke:var(--l7);--d:1.5s" cx="1700" cy="600" r="16"/><text class="" x="1735" y="610" text-anchor="start" style="font:900 32px var(--latin);fill:var(--ink)">T2</text><circle class="term pop" style="stroke:var(--l7);--d:1.5s" cx="1700" cy="700" r="16"/><text class="" x="1735" y="710" text-anchor="start" style="font:900 32px var(--latin);fill:var(--ink)">T3</text></svg>
+<p class="abs reveal mono" style="left:1330px;top:770px;font-size:24px;font-weight:700;color:var(--ink2);--d:1.6s">/ios-dev tickets/&lt;T&gt;.md</p>
+<div class="abs reveal" style="left:110px;top:870px;border-left:8px solid var(--l7);padding-left:24px;font:700 26px/1.7 var(--mono);color:var(--ink2);--d:1.7s">
+  /phase-workflow &lt;design doc&gt;<br>/phase-workflow 入口 B：&lt;PM spec&gt;</div>
+<p class="abs reveal" style="left:1000px;top:885px;width:810px;font:800 32px/1.5 var(--cjk);--d:1.8s">交棒一律<span class="hl">開新 session</span>；<br>每張 ticket 也各開一個。</p>
+</section>
+<section class="slide " style="--sec:var(--l4)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>上手</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 05 / 05</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">5</span>
+  <div><h2 class="sign-name">上手</h2><p class="sign-en">VIBE · TESTS · INSTALL</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M200 860 H1720" /><circle class="pop" style="--d:.5s" cx="200" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="200" y="935" text-anchor="middle" >路由</text><circle class="pop" style="--d:.5s" cx="580" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="580" y="935" text-anchor="middle" >架構影響</text><circle class="pop" style="--d:.5s" cx="960" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="960" y="935" text-anchor="middle" >審查</text><circle class="pop" style="--d:.5s" cx="1340" cy="860" r="16" fill="var(--ink)"/><text class="t-sm" x="1340" y="935" text-anchor="middle" >大功能</text><circle class="pop" style="--d:.7s" cx="1720" cy="860" r="34" fill="#fff" stroke="var(--l4)" stroke-width="12"/><text class="t-lab" x="1720" y="940" text-anchor="middle" style="fill:var(--l4);font-size:32px">上手</text><text class="t-mono" x="1720" y="800" text-anchor="middle" style="fill:var(--l4)">你在這裡</text></svg>
+</section>
+<section class="slide " style="--sec:var(--l4)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>上手</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:80px">不讀 code，也能做 iPhone app</h2>
+<p class="abs reveal" style="left:110px;top:300px;font:800 46px/1 var(--mono);background:var(--ink);color:#fff;padding:18px 28px;border-radius:18px;--d:.1s">/ios-vibe</p>
+<div class="abs reveal" style="left:110px;top:430px;width:860px;display:flex;gap:22px;--d:0.25s"><span style="flex:none;width:56px;height:56px;border-radius:50%;background:var(--l4);color:#fff;font:900 30px/58px var(--latin);text-align:center">1</span><div><p style="font:900 34px/1.3 var(--cjk)">AI 只問產品問題</p><p style="font:500 25px/1.5 var(--cjk);color:var(--muted);margin-top:4px">技術決定記進 docs/vibe-decisions.md</p></div></div><div class="abs reveal" style="left:110px;top:555px;width:860px;display:flex;gap:22px;--d:0.37s"><span style="flex:none;width:56px;height:56px;border-radius:50%;background:var(--l4);color:#fff;font:900 30px/58px var(--latin);text-align:center">2</span><div><p style="font:900 34px/1.3 var(--cjk)">寫完、測完、審完才找你</p><p style="font:500 25px/1.5 var(--cjk);color:var(--muted);margin-top:4px">另一個 AI 分身負責審查</p></div></div><div class="abs reveal" style="left:110px;top:680px;width:860px;display:flex;gap:22px;--d:0.49s"><span style="flex:none;width:56px;height:56px;border-radius:50%;background:var(--l4);color:#fff;font:900 30px/58px var(--latin);text-align:center">3</span><div><p style="font:900 34px/1.3 var(--cjk)">你拿到一張試用卡</p><p style="font:500 25px/1.5 var(--cjk);color:var(--muted);margin-top:4px">照步驟試，回「OK」或描述哪裡不對</p></div></div>
+<p class="abs reveal" style="left:110px;top:840px;width:860px;border-left:8px solid var(--l2);padding-left:22px;font:500 26px/1.6 var(--cjk);color:var(--ink2);--d:.7s">
+  目前只做<b>資料留在手機裡</b>的 app：<br>不含登入、付款、連網同步與上架。</p>
+<div class="card reveal" style="left:1040px;top:300px;width:770px;padding:44px 50px;transform-origin:center;rotate:-1.5deg;box-shadow:14px 14px 0 rgba(27,27,27,.12);--d:.4s">
+  <span class="tag" style="color:var(--l2)">試用卡</span>
+  <p style="font:900 38px/1.35 var(--cjk);margin-top:22px">記帳 app 可以新增一筆支出了</p>
+  <p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:10px">請你在 iPhone 上試（約 2 分鐘）</p>
+  <ol style="margin:24px 0 0 36px;font:600 29px/1.8 var(--cjk);color:var(--ink2)">
+    <li>打開 app → 應該看到空白的清單</li>
+    <li>點「＋」→ 輸入「午餐 120」→ 儲存</li>
+    <li>清單上應該出現「午餐 120」</li>
+    <li>完全關掉再打開，那筆還在嗎？</li></ol>
+  <p style="border-top:3px dashed var(--rule);margin-top:26px;padding-top:20px;font:500 23px/1.5 var(--cjk);color:var(--muted)">沒有人類讀過這份程式碼。審查的是 AI……</p></div>
+</section>
+<section class="slide " style="--sec:var(--l4)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>上手</span><span class="pg"></span></header>
+
+<h2 class="title reveal" style="font-size:96px">路由本身，也要被測</h2>
+<p class="sub reveal" style="top:285px;--d:.1s">改了流程對照表，先跑這兩層。</p>
+<div class="card reveal" style="left:110px;top:370px;width:830px;padding:44px 52px;--d:0.2s"><span class="tag" style="color:var(--l4)">不呼叫模型</span><p style="font:800 40px/1.2 var(--mono);margin-top:26px">validate-router.py</p><ul style="list-style:none;font:700 32px/1.45 var(--cjk);color:var(--ink2);margin-top:10px"><li style="display:flex;gap:16px;margin-top:22px"><span style="color:var(--l4)">●</span><span>router 點名的 skill、agent 真的找得到</span></li><li style="display:flex;gap:16px;margin-top:22px"><span style="color:var(--l4)">●</span><span>§ 交叉引用、檔案路徑、slash 指令對得上</span></li><li style="display:flex;gap:16px;margin-top:22px"><span style="color:var(--l4)">●</span><span>改名或解除安裝，不必等真 session 才踩到</span></li></ul><p style="font:500 23px/1.5 var(--cjk);color:var(--muted);margin-top:30px">靜態檢查，隨時可跑</p></div><div class="card reveal" style="left:980px;top:370px;width:830px;padding:44px 52px;--d:0.35s"><span class="tag" style="color:var(--l2)">呼叫模型</span><p style="font:800 40px/1.2 var(--mono);margin-top:26px">run_evals.py</p><ul style="list-style:none;font:700 32px/1.45 var(--cjk);color:var(--ink2);margin-top:10px"><li style="display:flex;gap:16px;margin-top:22px"><span style="color:var(--l2)">●</span><span>19 個情境案例，在測試 repo 真跑 Step 0</span></li><li style="display:flex;gap:16px;margin-top:22px"><span style="color:var(--l2)">●</span><span>比對確認畫面的固定欄位</span></li><li style="display:flex;gap:16px;margin-top:22px"><span style="color:var(--l2)">●</span><span>硬性檢查：確認之前不准動 repo</span></li></ul><p style="font:500 23px/1.5 var(--cjk);color:var(--muted);margin-top:30px">約 $1／案例；不加 --run 不花錢</p></div>
+</section>
+<section class="slide " style="--sec:var(--l4)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>上手</span><span class="pg"></span></header>
+
+<h2 class="abs reveal" style="left:110px;top:140px;font:900 88px/1.18 var(--cjk)">三步上車</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.3s;stroke-width:12px" d="M110 340 H1810" /><g class="pop" style="--d:0.60s"><circle cx="400" cy="340" r="40" fill="#fff" stroke="var(--l4)" stroke-width="10"/><text class="t-num" x="400" y="355" text-anchor="middle" style="font-size:38px">1</text></g><g class="pop" style="--d:0.72s"><circle cx="960" cy="340" r="40" fill="#fff" stroke="var(--l4)" stroke-width="10"/><text class="t-num" x="960" y="355" text-anchor="middle" style="font-size:38px">2</text></g><g class="pop" style="--d:0.84s"><circle cx="1520" cy="340" r="40" fill="#fff" stroke="var(--l4)" stroke-width="10"/><text class="t-num" x="1520" y="355" text-anchor="middle" style="font-size:38px">3</text></g></svg>
+<p class="abs reveal" style="left:130px;top:405px;width:540px;text-align:center;font:900 38px/1.3 var(--cjk);--d:0.70s">裝必要相依</p><div class="term-card reveal" style="left:130px;top:480px;width:540px;height:380px;font-size:26px;line-height:1.75;--d:0.80s"><p>swift-architecture-skill<br>swift-concurrency<br>swiftui-expert-skill<br>superpowers</p><p class="c" style="margin-top:22px;font-size:22px"># npx skills add …<br># /plugin install superpowers</p></div><p class="abs reveal" style="left:690px;top:405px;width:540px;text-align:center;font:900 38px/1.3 var(--cjk);--d:0.82s">安裝本專案</p><div class="term-card reveal" style="left:690px;top:480px;width:540px;height:380px;font-size:26px;line-height:1.75;--d:0.92s"><p>git clone …/ios-dev-skill<br>cd ios-dev-skill<br>./install.sh<br>./install.sh --check</p><p class="c" style="margin-top:22px;font-size:22px"># 必裝項目都要是 ✓</p></div><p class="abs reveal" style="left:1250px;top:405px;width:540px;text-align:center;font:900 38px/1.3 var(--cjk);--d:0.94s">第一個任務</p><div class="term-card reveal" style="left:1250px;top:480px;width:540px;height:380px;font-size:26px;line-height:1.75;--d:1.04s"><p>/ios-dev 在設定頁<br>新增匯出功能</p><p class="c" style="margin-top:22px;font-size:22px"># Codex 改用 $ios-dev<br># 先看確認畫面，再開工</p></div>
+<p class="foot reveal" style="top:920px;font-size:28px;--d:1.3s">一般安裝不改全域設定；加 <b class="mono">--vibe</b> 才會把 iOS 需求預設導向 ios-vibe。</p>
+</section>
+<section class="slide " style="--sec:var(--l4);--acc:var(--l2)">
+<header class="hdr"><span>IOS-DEV-SKILL · 路網圖</span><span class="sec"><i></i>上手</span><span class="pg"></span></header>
+
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l1);--d:0.2s;stroke-width:7px" d="M-20 990 H1940" /><path class="ln" pathLength="1" style="stroke:var(--l2);--d:0.26s;stroke-width:7px" d="M-20 1002 H1940" /><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.32s;stroke-width:7px" d="M-20 1014 H1940" /><path class="ln" pathLength="1" style="stroke:var(--l4);--d:0.38s;stroke-width:7px" d="M-20 1026 H1940" /><path class="ln" pathLength="1" style="stroke:var(--l5);--d:0.44s;stroke-width:7px" d="M-20 1038 H1940" /><path class="ln" pathLength="1" style="stroke:var(--l6);--d:0.5s;stroke-width:7px" d="M-20 1050 H1940" /><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.56s;stroke-width:7px" d="M-20 1062 H1940" /></svg>
+<h2 class="big reveal" style="top:230px;font-size:170px;--d:.1s">先判斷，<br><span class="amber">再動手</span>。</h2>
+<p class="abs reveal" style="left:110px;top:690px;font:800 42px/1.2 var(--latin);--d:.3s">github.com/peter6601/ios-dev-skill</p>
+<p class="abs reveal mono muted" style="left:110px;top:765px;font-size:28px;font-weight:700;--d:.4s">Claude Code：/ios-dev　·　Codex：$ios-dev</p>
+<div class="abs reveal" style="left:1380px;top:230px;width:430px;height:500px;background:#fff;border:5px solid var(--ink);border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;--d:.35s">
+  <div style="width:320px;height:320px"><svg style="width:320px;height:320px;max-width:none;max-height:none" viewBox="0 0 290 290" class="segno"><path transform="scale(10)" class="qrline" stroke="#1b1b1b" d="M0 0.5h7m4 0h1m2 0h1m1 0h3m3 0h7m-29 1h1m5 0h1m1 0h3m1 0h1m1 0h1m7 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h2m3 0h1m3 0h1m4 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m3 0h1m3 0h1m1 0h1m2 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m2 0h1m3 0h1m2 0h3m1 0h1m1 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-21 1h2m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m-21 1h1m5 0h1m1 0h1m4 0h3m1 0h2m2 0h2m2 0h3m-28 1h3m1 0h1m2 0h3m3 0h3m3 0h1m1 0h1m1 0h2m1 0h2m-28 1h3m1 0h1m1 0h1m1 0h2m1 0h3m1 0h1m1 0h1m6 0h1m-25 1h1m4 0h1m2 0h2m2 0h1m1 0h1m1 0h1m1 0h1m2 0h1m3 0h1m-26 1h2m1 0h4m1 0h2m5 0h2m1 0h2m2 0h2m4 0h1m-28 1h2m1 0h1m6 0h3m1 0h2m2 0h2m1 0h3m2 0h2m-27 1h1m3 0h1m3 0h1m1 0h1m2 0h3m2 0h2m2 0h3m-27 1h2m2 0h1m2 0h4m7 0h2m3 0h2m1 0h1m1 0h1m-26 1h1m2 0h2m1 0h3m1 0h2m2 0h3m1 0h1m1 0h1m1 0h2m-27 1h2m1 0h3m7 0h1m1 0h1m3 0h1m2 0h3m1 0h3m-29 1h7m3 0h4m1 0h1m1 0h3m4 0h2m2 0h1m-29 1h1m3 0h1m2 0h4m4 0h1m2 0h1m1 0h1m1 0h1m-23 1h1m3 0h1m1 0h2m1 0h1m1 0h14m1 0h3m-21 1h1m4 0h3m4 0h1m3 0h2m-26 1h7m2 0h1m2 0h1m1 0h3m1 0h3m1 0h1m1 0h3m-27 1h1m5 0h1m2 0h1m1 0h2m2 0h2m2 0h2m3 0h1m3 0h1m-29 1h1m1 0h3m1 0h1m2 0h2m1 0h3m1 0h1m1 0h8m1 0h1m-28 1h1m1 0h3m1 0h1m3 0h1m4 0h7m3 0h2m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m1 0h1m1 0h3m1 0h9m-28 1h1m5 0h1m2 0h1m1 0h1m1 0h2m1 0h1m5 0h2m1 0h2m1 0h1m-29 1h7m1 0h1m4 0h1m3 0h1m1 0h1m2 0h3m1 0h1"/></svg></div>
+  <p class="mono" style="font:700 22px/1 var(--mono);letter-spacing:.06em;color:var(--muted)">掃描上車 · MIT</p></div>
+</section>
+</main>
+<div class="progress" id="progress"></div>
+</div>
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   方向鍵／空白鍵／PageUp-Down／滑鼠滾輪／觸控滑動；網址 #頁碼 可直接跳頁
+   =========================================== */
+class SlidePresentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.stage = document.getElementById('deckStage');
+    this.bar = document.getElementById('progress');
+    this.current = 0;
+    this.slides.forEach((s, i) => {
+      const pg = s.querySelector('.pg');
+      if (pg) pg.textContent = String(i + 1).padStart(2, '0') + ' / ' + String(this.slides.length).padStart(2, '0');
+    });
+    this.fit(); addEventListener('resize', () => this.fit());
+    this.keys(); this.wheel(); this.touch();
+    const h = parseInt(location.hash.slice(1), 10);
+    this.show(Number.isFinite(h) ? h - 1 : 0, true);
+    addEventListener('hashchange', () => { const n = parseInt(location.hash.slice(1), 10); if (Number.isFinite(n) && n - 1 !== this.current) this.show(n - 1); });
+  }
+  fit() {
+    const f = Math.min(innerWidth / 1920, innerHeight / 1080);
+    this.stage.style.transform = `translate(${(innerWidth - 1920 * f) / 2}px, ${(innerHeight - 1080 * f) / 2}px) scale(${f})`;
+  }
+  editing() { const a = document.activeElement; return a && a.isContentEditable; }
+  keys() {
+    addEventListener('keydown', e => {
+      if (this.editing()) return;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); this.show(this.current + 1); }
+      if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); this.show(this.current - 1); }
+      if (e.key === 'Home') this.show(0);
+      if (e.key === 'End') this.show(this.slides.length - 1);
+    });
+  }
+  wheel() {
+    let lock = false;
+    addEventListener('wheel', e => {
+      if (this.editing() || lock || Math.abs(e.deltaY) < 20) return;
+      lock = true; setTimeout(() => lock = false, 700);
+      this.show(this.current + (e.deltaY > 0 ? 1 : -1));
+    }, { passive: true });
+  }
+  touch() {
+    let x0 = null, y0 = null;
+    addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    addEventListener('touchend', e => {
+      if (x0 === null || this.editing()) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) this.show(this.current + (dx < 0 ? 1 : -1));
+      x0 = null;
+    }, { passive: true });
+  }
+  show(i, first) {
+    i = Math.max(0, Math.min(i, this.slides.length - 1));
+    if (i === this.current && !first) return;
+    this.slides.forEach((s, k) => { s.classList.toggle('active', k === i); if (k !== i) s.classList.remove('visible'); });
+    const s = this.slides[i];
+    requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+    this.current = i;
+    this.bar.style.width = ((i + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+}
+
+/* ===========================================
+   INLINE EDITOR — E 鍵或左上角開關；Ctrl/Cmd+S 下載改好的檔案
+   修改會暫存在這台瀏覽器（localStorage），換台電腦不會帶過去
+   =========================================== */
+class InlineEditor {
+  constructor() {
+    this.isActive = false;
+    this.dirty = false;
+    this.btn = document.getElementById('editToggle');
+    this.toastEl = document.getElementById('toast');
+    this.targets = [...document.querySelectorAll('.slide *')].filter(el =>
+      !el.closest('svg') && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) );
+    /* 暫存的 key 綁定原始內容的雜湊：檔案本身改版後，舊的瀏覽器暫存自動失效，不會蓋掉新內容 */
+    let h = 0; const src = this.targets.map(t => t.innerHTML).join('\u0001');
+    for (let i = 0; i < src.length; i++) h = (h * 31 + src.charCodeAt(i)) | 0;
+    this.key = 'iosdev-transit-deck:' + (h >>> 0).toString(36);
+    this.restore();
+    this.bind();
+  }
+  restore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.key) || 'null');
+      if (saved && saved.length === this.targets.length) saved.forEach((h, i) => { if (h !== null) this.targets[i].innerHTML = h; });
+    } catch (e) {}
+  }
+  save() {
+    try { localStorage.setItem(this.key, JSON.stringify(this.targets.map(t => t.innerHTML))); } catch (e) {}
+  }
+  toggle() {
+    this.isActive = !this.isActive;
+    document.body.classList.toggle('editing', this.isActive);
+    this.btn.classList.toggle('active', this.isActive);
+    this.btn.textContent = this.isActive ? '完成編輯 (E)' : '編輯 (E)';
+    this.targets.forEach(t => t.contentEditable = this.isActive ? 'true' : 'false');
+    if (!this.isActive) { if (this.dirty) { this.save(); this.toast('已暫存在這台瀏覽器'); } document.activeElement && document.activeElement.blur(); }
+  }
+  toast(msg) { this.toastEl.textContent = msg; this.toastEl.classList.add('show'); setTimeout(() => this.toastEl.classList.remove('show'), 1600); }
+  download() {
+    this.save();
+    const doc = document.documentElement.cloneNode(true);
+    doc.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+    doc.querySelector('body').classList.remove('editing');
+    doc.querySelectorAll('.slide').forEach(s => s.classList.remove('active', 'visible'));
+    const blob = new Blob(['<!DOCTYPE html>\n' + doc.outerHTML], { type: 'text/html' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ios-dev-skill-路網圖.html'; a.click();
+    this.toast('已下載修改後的 HTML');
+  }
+  bind() {
+    const hot = document.querySelector('.edit-hotzone'); let t = null;
+    const show = () => { clearTimeout(t); this.btn.classList.add('show'); };
+    const hide = () => { t = setTimeout(() => { if (!this.isActive) this.btn.classList.remove('show'); }, 400); };
+    hot.addEventListener('mouseenter', show); hot.addEventListener('mouseleave', hide);
+    this.btn.addEventListener('mouseenter', show); this.btn.addEventListener('mouseleave', hide);
+    hot.addEventListener('click', () => this.toggle()); this.btn.addEventListener('click', () => this.toggle());
+    addEventListener('keydown', e => {
+      if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey && !(document.activeElement && document.activeElement.isContentEditable)) this.toggle();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); this.download(); }
+    });
+    document.addEventListener('input', () => { this.dirty = true; this.save(); });
+  }
+}
+
+window.deck = new SlidePresentation();
+window.editor = new InlineEditor();
+</script>
+</body>
+</html>
