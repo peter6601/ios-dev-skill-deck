@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codex 審、Claude 修，人放行 — ai-review</title>
+<meta name="description" content="ai-review 共識審查工作流簡報：Codex 唯讀審查、Claude 有限修復、人類最後放行。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   THEME TOKENS — 改顏色、字體從這裡改
+   路線色 l1–l7 對應七種情境，整份簡報固定不變
+   =========================================== */
+:root{
+  --stage-bg:#d9d4c7; --slide-bg:#F3EFE4;
+  --ink:#1B1B1B; --ink2:#3b3a36; --muted:#77736a; --card:#FFFDF7; --river:#DCE7EA; --rule:rgba(27,27,27,.14);
+  --cream:#EDE8DC;
+  --l1:#D2232A; --l2:#E89A00; --l3:#0070BD; --l4:#00964B; --l5:#8B4A9C; --l6:#A0662C; --l7:#00A0A8;
+  --latin:'Overpass','Noto Sans TC',sans-serif;
+  --cjk:'Noto Sans TC','Overpass',sans-serif;
+  --mono:'Overpass Mono','Noto Sans TC',monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+
+/* ===========================================
+   FIXED 16:9 STAGE — viewport-base.css（完整收錄）
+   =========================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000)}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff)}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff)}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1}
+img,video,canvas,svg{max-width:100%;max-height:100%}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000}
+@media print{
+  html,body{width:1920px;height:auto;overflow:visible;background:#fff}
+  .deck-viewport{position:static;overflow:visible;background:#fff}
+  .deck-stage{position:static;width:auto;height:auto;transform:none!important;background:none}
+  .slide{position:relative;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;width:1920px;height:1080px;break-after:page;page-break-after:always}
+  .slide:last-child{break-after:auto;page-break-after:auto}
+  .deck-controls{display:none!important}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}}
+
+/* ===========================================
+   SLIDE BASE — 米色紙＋點陣網格，像一張路網圖
+   =========================================== */
+.slide{color:var(--ink);font-family:var(--cjk);--acc:var(--sec);
+  background-image:radial-gradient(rgba(27,27,27,.085) 1.5px,transparent 1.6px);background-size:40px 40px;
+  transition:opacity .45s ease,visibility 0s linear .45s}
+.slide.active{transition:opacity .45s ease,visibility 0s}
+.abs{position:absolute}
+.hl{color:var(--acc)}
+.red{color:var(--l1)} .amber{color:var(--l2)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+
+/* === HEADER（每頁頂端的站牌列） === */
+.hdr{position:absolute;left:110px;right:110px;top:52px;display:flex;justify-content:space-between;align-items:center;
+  font:700 20px/1 var(--mono);letter-spacing:.06em;color:var(--muted)}
+.hdr .sec{display:flex;align-items:center;gap:12px;color:var(--ink2)}
+.hdr .sec i{width:30px;height:12px;border-radius:6px;background:var(--sec);display:block}
+
+/* === TYPE === */
+.kicker{position:absolute;left:110px;font:700 26px/1 var(--mono);letter-spacing:.08em;color:var(--acc)}
+.title{position:absolute;left:110px;top:150px;font:900 88px/1.18 var(--cjk);letter-spacing:.01em}
+.big{position:absolute;left:104px;font:900 140px/1.14 var(--cjk);letter-spacing:.01em}
+.lead{position:absolute;left:110px;font:500 36px/1.6 var(--cjk);color:var(--ink2)}
+.sub{position:absolute;left:110px;font:500 32px/1.5 var(--cjk);color:var(--muted)}
+.foot{position:absolute;left:110px;font:500 28px/1.5 var(--cjk);color:var(--muted)}
+.lead b,.sub b,.foot b{color:var(--ink);font-weight:700}
+
+/* === BADGES === */
+.badge{display:inline-block;width:46px;height:46px;border-radius:10px;color:#fff;font:900 28px/48px var(--latin);text-align:center;flex:none}
+.tag{display:inline-block;padding:6px 14px;border-radius:999px;font:700 20px/1 var(--mono);letter-spacing:.06em;border:3px solid currentColor}
+
+/* === CARDS（月台牌） === */
+.card{position:absolute;background:var(--card);border:5px solid var(--ink);border-radius:28px;padding:30px 40px}
+.card .ct{font:900 40px/1.2 var(--cjk)}
+.card .ct small{font:500 26px/1 var(--cjk);color:var(--muted);margin-left:14px}
+.card p{font:500 30px/1.55 var(--cjk);color:var(--ink2);margin-top:12px}
+.term-card{position:absolute;background:var(--ink);color:var(--cream);border-radius:28px;padding:34px 44px;font:500 26px/1.7 var(--mono)}
+.term-card .k{color:#9c978b}
+.term-card .c{color:#7d796f}
+
+/* === SVG MAP PRIMITIVES === */
+svg.map{position:absolute;left:0;top:0;width:1920px;height:1080px;max-width:none;max-height:none;overflow:visible;pointer-events:none}
+.ln{fill:none;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1 1;stroke-dashoffset:1}
+.slide.visible .ln{stroke-dashoffset:0;transition:stroke-dashoffset 1.4s var(--ease) var(--d,.3s)}
+.stn{fill:#fff;stroke:var(--ink);stroke-width:6}
+.term{fill:#fff;stroke-width:8}
+.hub{fill:#fff;stroke:var(--ink);stroke-width:9}
+.river{fill:none;stroke:var(--river);stroke-width:120;stroke-linecap:round}
+.t-lab{font:700 28px var(--cjk);fill:var(--ink)}
+.t-sm{font:500 24px var(--cjk);fill:var(--muted)}
+.t-mono{font:700 24px var(--mono);fill:var(--muted);letter-spacing:.04em}
+.t-num{font:900 44px var(--latin);fill:var(--ink)}
+
+/* === REVEAL ANIMATIONS（換頁時依序出現） === */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .8s var(--ease) var(--d,0s),transform .8s var(--ease) var(--d,0s)}
+.slide.visible .reveal{opacity:1;transform:none}
+.pop{opacity:0;transform:scale(.6);transform-box:fill-box;transform-origin:center;transition:opacity .6s var(--ease) var(--d,.2s),transform .6s var(--ease) var(--d,.2s)}
+.slide.visible .pop{opacity:1;transform:none}
+
+/* === SECTION SIGN（章節站牌） === */
+.sign-band{position:absolute;left:0;right:0;top:300px;height:380px;background:var(--ink);border-bottom:22px solid var(--sec);
+  display:flex;align-items:center;gap:56px;padding-left:150px}
+.sign-num{width:180px;height:180px;border-radius:50%;background:var(--sec);color:#fff;font:900 110px/184px var(--latin);text-align:center;flex:none}
+.sign-name{color:#fff;font:900 136px/1.1 var(--cjk);letter-spacing:.02em}
+.sign-en{color:#b9b4a8;font:800 36px/1 var(--latin);letter-spacing:.14em;margin-top:22px}
+.sign-top{position:absolute;left:150px;top:220px;font:700 26px/1 var(--mono);letter-spacing:.1em;color:var(--muted)}
+
+/* ===========================================
+   INLINE EDITING — 左上角 hover 或按 E 進入編輯
+   =========================================== */
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer}
+.edit-toggle{position:fixed;top:16px;left:16px;z-index:10001;opacity:0;pointer-events:none;transition:opacity .3s ease;
+  border:3px solid var(--ink);background:var(--card);border-radius:999px;padding:8px 16px;font:700 14px/1 var(--mono);cursor:pointer}
+.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto}
+.edit-toggle.active{background:var(--l2);color:#fff;border-color:var(--l2)}
+body.editing [contenteditable="true"]{outline:2px dashed rgba(0,112,189,.55);outline-offset:4px;cursor:text}
+.toast{position:fixed;right:20px;bottom:20px;z-index:10002;background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font:700 14px/1 var(--mono);opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+.progress{position:fixed;left:0;bottom:0;height:4px;background:var(--ink);z-index:999;transition:width .4s var(--ease)}
+
+.chips .chip{width:26px;height:10px;border-radius:5px;display:block}
+
+.card .ct{font:900 38px/1.25 var(--cjk)}
+.card p{font:500 28px/1.55 var(--cjk)}
+.cmdline{font:700 24px/1.6 var(--mono);color:var(--cream)}
+</style>
+</head>
+<body>
+<div class="edit-hotzone" aria-hidden="true"></div>
+<button class="edit-toggle" id="editToggle" title="編輯模式 (E)">編輯 (E)</button>
+<div class="toast" id="toast" role="status"></div>
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage" aria-label="ai-review 簡報">
+<section class="slide" style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<h1 class="abs reveal" style="left:104px;top:150px;font:900 120px/1.14 var(--cjk);--d:.05s">Codex 審、Claude 修，<br><span class="amber">人放行</span>。</h1>
+<p class="abs reveal" style="left:110px;top:445px;font:500 32px/1.5 var(--cjk);color:var(--ink2);--d:.15s"><b style="font-family:var(--latin);color:var(--ink)">ai-review</b>：Claude Code × Codex 的本機共識審查工作流</p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:12px" d="M150 760 H1770"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.3s" cx="150" cy="760" r="18"/><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.7s;stroke-width:10px" d="M620 760 C 620 560, 1080 560, 1080 760"/><g class="pop" style="--d:0.5s"><rect x="516.0" y="750" width="8.0" height="110.0" fill="var(--ink)"/><rect x="493.0" y="610.0" width="54.0" height="140.0" rx="14.0" fill="var(--ink)"/><circle cx="520" cy="636.0" r="15.0" fill="var(--l1)"/><circle cx="520" cy="680.0" r="15.0" fill="#3b3a36"/><circle cx="520" cy="724.0" r="15.0" fill="#3b3a36"/></g><text x="850" y="560" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--l3)">Claude 回修（最多 6 圈）</text><circle class="stn pop" style="stroke:var(--l3);stroke-width:5px;--d:1.0s" cx="850" cy="610" r="12"/><g class="pop" style="--d:1.2s"><rect x="1406" y="700.0" width="28" height="120" rx="8" fill="#fff" stroke="var(--l2)" stroke-width="7"/><rect x="1411" y="708.0" width="18" height="12" fill="var(--l2)"/><rect x="1411" y="754.0" width="18" height="12" fill="var(--l2)"/><rect x="1411" y="800.0" width="18" height="12" fill="var(--l2)"/></g><text x="1420" y="682.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l2)">人工放行</text><text x="1420" y="856.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">approve-code</text><circle class="term pop" style="stroke:var(--ink);--d:1.4s" cx="1770" cy="760" r="22"/><text x="1770" y="840" text-anchor="middle" style="font:800 30px var(--cjk);fill:var(--ink)">合併</text><text x="150" y="830" text-anchor="middle" style="font:800 28px var(--cjk);fill:var(--ink)">你的變更</text><text x="520" y="900" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">Codex 審查</text><text x="520" y="932" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">唯讀</text></svg>
+<p class="abs reveal mono muted" style="left:110px;top:1000px;font-size:22px;font-weight:700;letter-spacing:.04em;--d:.5s">github.com/peter6601/ai-review</p>
+</section>
+<section class="slide" style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:220px">起點 · WHY</p>
+<h2 class="big reveal" style="top:280px;--d:.1s">AI 可以互相檢查，<br>但不會替<span class="amber">人類放行</span>。</h2>
+<p class="lead reveal" style="top:665px;width:1440px;--d:.25s">讓另一家模型來審，看到的盲點不同；可是 Codex 說 PASS，也不代表就是對的。<br><b>所以這條線的最後一道閘門，永遠留給人。</b></p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:14px" d="M-20 940 H1940"/><g class="pop" style="--d:0.9s"><rect x="1636.4" y="935" width="7.2" height="99.0" fill="var(--ink)"/><rect x="1615.7" y="809.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="1640" cy="832.4" r="13.5" fill="#3b3a36"/><circle cx="1640" cy="872.0" r="13.5" fill="var(--l2)"/><circle cx="1640" cy="911.6" r="13.5" fill="#3b3a36"/></g></svg>
+</section>
+<section class="slide" style="--sec:var(--ink)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:88px">三個角色，各管一段</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><g class="pop" style="--d:0.4s"><rect x="326.8" y="470" width="6.4" height="88.0" fill="var(--ink)"/><rect x="308.4" y="358.0" width="43.2" height="112.0" rx="11.200000000000001" fill="var(--ink)"/><circle cx="330" cy="378.8" r="12.0" fill="#3b3a36"/><circle cx="330" cy="414.0" r="12.0" fill="#3b3a36"/><circle cx="330" cy="449.20000000000005" r="12.0" fill="var(--l4)"/></g><path class="ln" pathLength="1" style="stroke:var(--l3);--d:0.5s;stroke-width:10px" d="M820 420 C 820 330, 1100 330, 1100 420 C 1100 510, 820 510, 820 420"/><g class="pop" style="--d:0.6s"><rect x="1526" y="372.0" width="28" height="96" rx="8" fill="#fff" stroke="var(--l2)" stroke-width="7"/><rect x="1531" y="380.0" width="18" height="12" fill="var(--l2)"/><rect x="1531" y="414.0" width="18" height="12" fill="var(--l2)"/><rect x="1531" y="448.0" width="18" height="12" fill="var(--l2)"/></g><text x="1540" y="354.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l2)"></text><text x="1540" y="504.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)"></text></svg><div class="card reveal" style="left:110px;top:560px;width:540px;height:330px;padding:30px 40px;border-left:20px solid var(--l4);--d:0.3s;"><p class="ct" style="color:var(--l4)">Codex<span style="font:700 26px var(--cjk);color:var(--muted);margin-left:14px">號誌</span></p><p style="margin-top:16px">唯讀審查：只回 findings，不改任何東西。</p></div><div class="card reveal" style="left:690px;top:560px;width:540px;height:330px;padding:30px 40px;border-left:20px solid var(--l3);--d:0.4s;"><p class="ct" style="color:var(--l3)">Claude<span style="font:700 26px var(--cjk);color:var(--muted);margin-left:14px">回修班</span></p><p style="margin-top:16px">只在程式碼審查裡修，最多六輪；每次修完都重新測試、重新審。</p></div><div class="card reveal" style="left:1270px;top:560px;width:540px;height:330px;padding:30px 40px;border-left:20px solid var(--l2);--d:0.5s;"><p class="ct" style="color:var(--l2)">你<span style="font:700 26px var(--cjk);color:var(--muted);margin-left:14px">站長</span></p><p style="margin-top:16px">逐條取捨文件 findings；程式碼的最後核准只能由你來按。</p></div>
+</section>
+<section class="slide" style="--sec:var(--ink)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:88px">兩個入口</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.3s;stroke-width:12px" d="M560 430 H1780"/><path class="ln" pathLength="1" style="stroke:var(--l5);--d:0.4s;stroke-width:12px" d="M560 720 H1780"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.7s" cx="640" cy="430" r="16"/><text x="640" y="395" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">文件</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.7799999999999999s" cx="920" cy="430" r="16"/><text x="920" y="395" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">Codex 唯讀審</text><circle class="stn pop" style="stroke:var(--l2);stroke-width:8px;--d:0.86s" cx="1200" cy="430" r="22"/><text x="1200" y="395" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--l2)">你逐條取捨</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.94s" cx="1480" cy="430" r="16"/><text x="1480" y="395" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">Claude 改採納項</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.02s" cx="1760" cy="430" r="16"/><text x="1760" y="395" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">再審</text><circle class="stn pop" style="stroke:var(--l2);stroke-width:8px;--d:0.8s" cx="640" cy="720" r="22"/><text x="640" y="685" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--l2)">你的變更</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.88s" cx="920" cy="720" r="16"/><text x="920" y="685" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">跑驗證</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.9600000000000001s" cx="1200" cy="720" r="16"/><text x="1200" y="685" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">Codex 審</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.04s" cx="1480" cy="720" r="16"/><text x="1480" y="685" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">Claude 修</text><circle class="stn pop" style="stroke:var(--l2);stroke-width:8px;--d:1.12s" cx="1760" cy="720" r="22"/><text x="1760" y="685" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--l2)">你核准</text></svg><div class="abs reveal" style="left:110px;top:380px;width:420px;--d:.2s"><p style="font:800 34px/1.2 var(--mono);color:var(--l7)">consensus-plan</p><p class="small" style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:8px">文件已寫好、還沒有 code</p></div><div class="abs reveal" style="left:110px;top:670px;width:420px;--d:.3s"><p style="font:800 34px/1.2 var(--mono);color:var(--l5)">consensus-review</p><p style="font:500 26px/1.5 var(--cjk);color:var(--muted);margin-top:8px">功能、分支或 bug fix 已完成</p></div><p class="abs reveal" style="left:110px;top:900px;width:1700px;font:500 34px/1.55 var(--cjk);color:var(--ink2);--d:0.9s;">選哪個入口，<b style="color:var(--ink)">看 code 在不在</b>，不看流程走到哪。</p>
+</section>
+<section class="slide" style="--sec:var(--l7)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>文件審查</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 01 / 03</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">1</span>
+  <div><h2 class="sign-name">文件審查</h2><p class="sign-en">CONSENSUS-PLAN · DOC REVIEW</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M400 860 H1520"/><circle class="pop" style="--d:.7s" cx="400" cy="860" r="34" fill="#fff" stroke="var(--l7)" stroke-width="12"/><text x="400" y="940" text-anchor="middle" style="font:800 32px var(--cjk);fill:var(--l7)">文件審查</text><text x="400" y="800" text-anchor="middle" style="font:700 24px var(--mono);fill:var(--l7)">你在這裡</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.5s" cx="960" cy="860" r="16"/><text x="960" y="935" text-anchor="middle" style="font:500 26px var(--cjk);fill:var(--muted)">程式碼審查</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.5s" cx="1520" cy="860" r="16"/><text x="1520" y="935" text-anchor="middle" style="font:500 26px var(--cjk);fill:var(--muted)">實測</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>文件審查</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px">文件審查：Codex 只讀，人來決定</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--l7);--d:0.3s;stroke-width:12px" d="M150 560 H1790"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.6s" cx="220" cy="560" r="18"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.7s" cx="520" cy="560" r="18"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.8s" cx="820" cy="560" r="18"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:0.9s" cx="1120" cy="560" r="24"/><circle class="stn pop" style="stroke:var(--l2);stroke-width:9px;--d:1.0s" cx="1420" cy="560" r="24"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:1.1s" cx="1720" cy="560" r="18"/><path class="pop" style="--d:1.4s" d="M1720 590 C 1700 760, 560 760, 525 592" fill="none" stroke="var(--l7)" stroke-width="6" stroke-dasharray="14 12" stroke-linecap="round"/><text x="1120" y="795" text-anchor="middle" style="font:700 24px var(--cjk);fill:var(--l7)">文件改過才能再審；沒改會被拒</text></svg><div class="abs reveal" style="left:70px;top:450px;width:300px;text-align:center;--d:0.70s"><p style="font:900 30px/1.25 var(--cjk);color:var(--ink)">凍結文件與 lens</p><p style="font:500 22px/1.4 var(--mono);color:var(--muted);margin-top:4px">init doc</p></div><div class="abs reveal" style="left:370px;top:390px;width:300px;text-align:center;--d:0.80s"><p style="font:900 30px/1.25 var(--cjk);color:var(--ink)">Codex 審一次</p><p style="font:500 22px/1.4 var(--mono);color:var(--muted);margin-top:4px">唯讀</p></div><div class="abs reveal" style="left:670px;top:450px;width:300px;text-align:center;--d:0.90s"><p style="font:900 30px/1.25 var(--cjk);color:var(--ink)">findings 報告</p><p style="font:500 22px/1.4 var(--mono);color:var(--muted);margin-top:4px">寫在文件旁</p></div><div class="abs reveal" style="left:970px;top:390px;width:300px;text-align:center;--d:1.00s"><p style="font:900 30px/1.25 var(--cjk);color:var(--l2)">你逐條取捨</p><p style="font:500 22px/1.4 var(--mono);color:var(--muted);margin-top:4px">採納／不採納／自己改</p></div><div class="abs reveal" style="left:1270px;top:450px;width:300px;text-align:center;--d:1.10s"><p style="font:900 30px/1.25 var(--cjk);color:var(--l2)">Claude 只改採納項</p><p style="font:500 22px/1.4 var(--mono);color:var(--muted);margin-top:4px">你看過 diff</p></div><div class="abs reveal" style="left:1570px;top:390px;width:300px;text-align:center;--d:1.20s"><p style="font:900 30px/1.25 var(--cjk);color:var(--ink)">再審</p><p style="font:500 22px/1.4 var(--mono);color:var(--muted);margin-top:4px">re-review</p></div><p class="abs reveal" style="left:110px;top:860px;width:1700px;font:500 32px/1.55 var(--cjk);color:var(--ink2);--d:1.5s;">審查過程不改原文件、不跑測試、不寫 code；<b style="color:var(--ink)">findings 本身就是交付物。</b></p>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>文件審查</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:88px">一次審一種角度：lens</h2><div class="card reveal" style="left:110px;top:300px;width:540px;height:470px;padding:30px 40px;--d:0.2s;"><p style="font:800 30px/1.2 var(--mono);color:var(--l7);margin:0">requirement</p><p style="font:700 26px/1.4 var(--cjk);color:var(--muted);margin-top:6px">需求規格</p><p class="ct" style="margin-top:26px">有沒有洞？</p><p style="margin-top:14px">沒寫到的行為、沒定義的邊界、沒人測得了的驗收條件。</p></div><div class="card reveal" style="left:690px;top:300px;width:540px;height:470px;padding:30px 40px;--d:0.30000000000000004s;"><p style="font:800 30px/1.2 var(--mono);color:var(--l7);margin:0">direction</p><p style="font:700 26px/1.4 var(--cjk);color:var(--muted);margin-top:6px">設計文件</p><p class="ct" style="margin-top:26px">方向對嗎？</p><p style="margin-top:14px">它排除了什麼、有沒有更便宜的做法、是不是在解沒人有的問題。</p></div><div class="card reveal" style="left:1270px;top:300px;width:540px;height:470px;padding:30px 40px;--d:0.4s;"><p style="font:800 30px/1.2 var(--mono);color:var(--l7);margin:0">implementation</p><p style="font:700 26px/1.4 var(--cjk);color:var(--muted);margin-top:6px">實作規格</p><p class="ct" style="margin-top:26px">跟現有 code 對得上嗎？</p><p style="margin-top:14px">它假設的名稱、契約、呼叫點，和悄悄矛盾的地方。</p></div><p class="abs reveal" style="left:110px;top:830px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.6s;">一份檔案其實是兩份文件，就審兩次；參考資料最多 5 段、16,000 tokens，<b style="color:var(--ink)">要指到精確的章節</b>。</p>
+</section>
+<section class="slide" style="--sec:var(--l7);--acc:var(--l7)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>文件審查</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px">逐條取捨，Claude 只改你採納的</h2><div class="card reveal" style="left:110px;top:300px;width:540px;height:300px;padding:30px 40px;border-left:20px solid var(--l4);--d:0.2s;"><p class="ct" style="color:var(--l4)">採納</p><p style="margin-top:16px">Claude 只改這幾條，不順手改別的。</p></div><div class="card reveal" style="left:690px;top:300px;width:540px;height:300px;padding:30px 40px;border-left:20px solid var(--l1);--d:0.30000000000000004s;"><p class="ct" style="color:var(--l1)">不採納</p><p style="margin-top:16px">理由用你的話，寫進文件的「已知取捨」段。</p></div><div class="card reveal" style="left:1270px;top:300px;width:540px;height:300px;padding:30px 40px;border-left:20px solid var(--l3);--d:0.4s;"><p class="ct" style="color:var(--l3)">自己改</p><p style="margin-top:16px">你動手；Claude 不碰。</p></div><h3 class="abs reveal" style="left:110px;top:680px;font:900 60px/1.35 var(--cjk);--d:.6s">你核過 diff 才再審，<span class="amber">不自動循環</span>。</h3><p class="abs reveal" style="left:110px;top:800px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.7s;">文件審查沒有「核准」這件事：Codex 的 PASS 只是一次仔細的閱讀，不是放行。</p>
+</section>
+<section class="slide" style="--sec:var(--l5)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>程式碼審查</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 02 / 03</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">2</span>
+  <div><h2 class="sign-name">程式碼審查</h2><p class="sign-en">CONSENSUS-REVIEW · CODE</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M400 860 H1520"/><circle class="pop" style="--d:.5s" cx="400" cy="860" r="16" fill="var(--ink)"/><text x="400" y="935" text-anchor="middle" style="font:500 26px var(--cjk);fill:var(--muted)">文件審查</text><circle class="pop" style="--d:.7s" cx="960" cy="860" r="34" fill="#fff" stroke="var(--l5)" stroke-width="12"/><text x="960" y="940" text-anchor="middle" style="font:800 32px var(--cjk);fill:var(--l5)">程式碼審查</text><text x="960" y="800" text-anchor="middle" style="font:700 24px var(--mono);fill:var(--l5)">你在這裡</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.5s" cx="1520" cy="860" r="16"/><text x="1520" y="935" text-anchor="middle" style="font:500 26px var(--cjk);fill:var(--muted)">實測</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>程式碼審查</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px">程式碼審查：一圈一圈，直到你放行</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:12px" d="M150 640 H600"/><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.9s;stroke-width:12px" d="M1250 640 H1780"/><ellipse class="ln" pathLength="1" style="stroke:var(--l3);--d:.5s;stroke-width:12px" cx="925" cy="640" rx="325" ry="170"/><circle class="stn pop" style="stroke:var(--ink);stroke-width:6px;--d:0.4s" cx="200" cy="640" r="18"/><text x="200" y="700" text-anchor="middle" style="font:800 26px var(--mono);fill:var(--ink)">init</text><text x="200" y="734" text-anchor="middle" style="font:500 22px var(--cjk);fill:var(--muted)">凍結範圍</text><g class="pop" style="--d:0.5s"><rect x="406" y="592.0" width="28" height="96" rx="8" fill="#fff" stroke="var(--l3)" stroke-width="7"/><rect x="411" y="600.0" width="18" height="12" fill="var(--l3)"/><rect x="411" y="634.0" width="18" height="12" fill="var(--l3)"/><rect x="411" y="668.0" width="18" height="12" fill="var(--l3)"/></g><text x="420" y="574.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l3)">閘門 1</text><text x="420" y="724.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">approve-review</text><circle class="stn pop" style="stroke:var(--ink);stroke-width:7px;--d:0.8s" cx="700" cy="520" r="20"/><text x="700" y="486" text-anchor="middle" style="font:900 30px var(--cjk);fill:var(--ink)">跑驗證</text><circle class="stn pop" style="stroke:var(--l4);stroke-width:7px;--d:0.8s" cx="1150" cy="520" r="20"/><text x="1150" y="486" text-anchor="middle" style="font:900 30px var(--cjk);fill:var(--l4)">Codex 審</text><circle class="stn pop" style="stroke:var(--l3);stroke-width:7px;--d:0.8s" cx="925" cy="810" r="20"/><text x="925" y="860" text-anchor="middle" style="font:900 30px var(--cjk);fill:var(--l3)">Claude 修</text><text x="925" y="650" text-anchor="middle" style="font:700 26px var(--cjk);fill:var(--muted)">同一個 run 裡</text><text x="925" y="686" text-anchor="middle" style="font:900 34px var(--cjk);fill:var(--l3)">最多 6 圈</text><path class="pop" style="--d:1.0s" d="M1130 755 L1290 840" stroke="var(--l1)" stroke-width="6" stroke-dasharray="10 10" fill="none"/><g class="pop" style="--d:1.0s"><rect x="1316" y="812.0" width="28" height="96" rx="8" fill="#fff" stroke="var(--l1)" stroke-width="7"/><rect x="1321" y="820.0" width="18" height="12" fill="var(--l1)"/><rect x="1321" y="854.0" width="18" height="12" fill="var(--l1)"/><rect x="1321" y="888.0" width="18" height="12" fill="var(--l1)"/></g><text x="1330" y="794.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l1)">閘門 2</text><text x="1330" y="944.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">approve-risk</text><text x="1330" y="990" text-anchor="middle" style="font:700 22px var(--cjk);fill:var(--l1)">高風險修改才停</text><g class="pop" style="--d:1.1s"><rect x="1466" y="580.0" width="28" height="120" rx="8" fill="#fff" stroke="var(--l2)" stroke-width="7"/><rect x="1471" y="588.0" width="18" height="12" fill="var(--l2)"/><rect x="1471" y="634.0" width="18" height="12" fill="var(--l2)"/><rect x="1471" y="680.0" width="18" height="12" fill="var(--l2)"/></g><text x="1480" y="562.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l2)">閘門 3</text><text x="1480" y="736.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)">approve-code</text><circle class="term pop" style="stroke:var(--ink);--d:1.3s" cx="1740" cy="640" r="22"/><text x="1740" y="710" text-anchor="middle" style="font:800 26px var(--cjk);fill:var(--ink)">合併／PR</text></svg><p class="abs reveal" style="left:110px;top:950px;width:1700px;font:500 28px/1.55 var(--cjk);color:var(--ink2);--d:1.4s;">Codex 永遠先看 code；Claude 修完一定重跑驗證、再給 Codex 審。</p>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>程式碼審查</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:88px">開跑前，要先湊齊這六樣</h2><div class="card reveal" style="left:110px;top:300px;width:540px;height:270px;padding:30px 40px;--d:0.15s;"><p style="font:900 26px/1 var(--latin);color:var(--l5);margin:0">01</p><p class="ct" style="margin-top:14px">Repo</p><p style="margin-top:10px;font-size:26px">目標 worktree 的絕對路徑</p></div><div class="card reveal" style="left:690px;top:300px;width:540px;height:270px;padding:30px 40px;--d:0.21s;"><p style="font:900 26px/1 var(--latin);color:var(--l5);margin:0">02</p><p class="ct" style="margin-top:14px">Base</p><p style="margin-top:10px;font-size:26px">明確給，不猜 main、HEAD 或 merge base</p></div><div class="card reveal" style="left:1270px;top:300px;width:540px;height:270px;padding:30px 40px;--d:0.27s;"><p style="font:900 26px/1 var(--latin);color:var(--l5);margin:0">03</p><p class="ct" style="margin-top:14px">Brief</p><p style="margin-top:10px;font-size:26px">一兩句話：這個改動原本要做到什麼</p></div><div class="card reveal" style="left:110px;top:600px;width:540px;height:270px;padding:30px 40px;--d:0.32999999999999996s;"><p style="font:900 26px/1 var(--latin);color:var(--l5);margin:0">04</p><p class="ct" style="margin-top:14px">Profile</p><p style="margin-top:10px;font-size:26px">ios 或 generic，建立前先講給你聽</p></div><div class="card reveal" style="left:690px;top:600px;width:540px;height:270px;padding:30px 40px;--d:0.39s;"><p style="font:900 26px/1 var(--latin);color:var(--l5);margin:0">05</p><p class="ct" style="margin-top:14px">聚焦的驗證指令</p><p style="margin-top:10px;font-size:26px">至少一個針對這次的測試；不接受冒煙測試、整包測試頂替</p></div><div class="card reveal" style="left:1270px;top:600px;width:540px;height:270px;padding:30px 40px;--d:0.44999999999999996s;"><p style="font:900 26px/1 var(--latin);color:var(--l5);margin:0">06</p><p class="ct" style="margin-top:14px">iOS preflight</p><p style="margin-top:10px;font-size:26px">三個 specialist 的 findings，init 時一起交</p></div><p class="abs reveal" style="left:110px;top:920px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.6s;">缺什麼就問人，<b style="color:var(--ink)">不從 branch 或 diff 猜</b>。</p>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>程式碼審查</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:80px">三道閘門，只有最後一道不能自動</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:10px" d="M110 470 H1810"/><g class="pop" style="--d:0.5s"><rect x="386" y="422.0" width="28" height="96" rx="8" fill="#fff" stroke="var(--l3)" stroke-width="7"/><rect x="391" y="430.0" width="18" height="12" fill="var(--l3)"/><rect x="391" y="464.0" width="18" height="12" fill="var(--l3)"/><rect x="391" y="498.0" width="18" height="12" fill="var(--l3)"/></g><text x="400" y="404.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l3)"></text><text x="400" y="554.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)"></text><g class="pop" style="--d:0.65s"><rect x="946" y="422.0" width="28" height="96" rx="8" fill="#fff" stroke="var(--l1)" stroke-width="7"/><rect x="951" y="430.0" width="18" height="12" fill="var(--l1)"/><rect x="951" y="464.0" width="18" height="12" fill="var(--l1)"/><rect x="951" y="498.0" width="18" height="12" fill="var(--l1)"/></g><text x="960" y="404.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l1)"></text><text x="960" y="554.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)"></text><g class="pop" style="--d:0.8s"><rect x="1506" y="410.0" width="28" height="120" rx="8" fill="#fff" stroke="var(--l2)" stroke-width="7"/><rect x="1511" y="418.0" width="18" height="12" fill="var(--l2)"/><rect x="1511" y="464.0" width="18" height="12" fill="var(--l2)"/><rect x="1511" y="510.0" width="18" height="12" fill="var(--l2)"/></g><text x="1520" y="392.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l2)"></text><text x="1520" y="566.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)"></text></svg><div class="abs reveal" style="left:150px;top:560px;width:500px;text-align:center;--d:0.60s"><p style="font:900 34px/1.2 var(--cjk);color:var(--l3)">閘門 1</p><p style="font:800 28px/1.4 var(--mono);margin-top:8px">approve-review</p><p style="font:600 28px/1.5 var(--cjk);color:var(--ink2);margin-top:6px">核准審查範圍</p><p style="display:inline-block;margin-top:14px;padding:6px 16px;border-radius:999px;border:3px solid var(--muted);font:800 22px/1.2 var(--cjk);color:var(--muted)">可 --auto</p></div><div class="abs reveal" style="left:710px;top:560px;width:500px;text-align:center;--d:0.72s"><p style="font:900 34px/1.2 var(--cjk);color:var(--l1)">閘門 2</p><p style="font:800 28px/1.4 var(--mono);margin-top:8px">approve-risk</p><p style="font:600 28px/1.5 var(--cjk);color:var(--ink2);margin-top:6px">核准高風險修改</p><p style="display:inline-block;margin-top:14px;padding:6px 16px;border-radius:999px;border:3px solid var(--muted);font:800 22px/1.2 var(--cjk);color:var(--muted)">可 --auto</p></div><div class="abs reveal" style="left:1270px;top:560px;width:500px;text-align:center;--d:0.84s"><p style="font:900 34px/1.2 var(--cjk);color:var(--l2)">閘門 3</p><p style="font:800 28px/1.4 var(--mono);margin-top:8px">approve-code</p><p style="font:600 28px/1.5 var(--cjk);color:var(--ink2);margin-top:6px">最終核准</p><p style="display:inline-block;margin-top:14px;padding:6px 16px;border-radius:999px;border:3px solid var(--l2);font:800 22px/1.2 var(--cjk);color:var(--l2)">永遠人工，沒有 --auto</p></div><p class="abs reveal" style="left:110px;top:880px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:1.0s;">自動核准全域限流 <b style="color:var(--ink)">60 秒最多 5 次</b>；紀錄寫 <span class="mono">agent:auto-approval</span>，不冒充人。</p>
+</section>
+<section class="slide" style="--sec:var(--l5);--acc:var(--l5)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>程式碼審查</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:220px">聯鎖 · INTERLOCKING</p>
+<h2 class="big reveal" style="top:280px;--d:.1s">路線一變，<br><span class="hl">號誌就失效</span>。</h2>
+<p class="lead reveal" style="top:665px;width:1440px;--d:.25s">核准綁定當下的 base 與完整 patch；code 一改，舊核准就作廢。<br>claude、codex 的執行檔在建立時記下指紋；<br>驗證指令不經 shell，只允許可信任路徑上的工具。</p>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:14px" d="M-20 940 H1940"/><g class="pop" style="--d:0.9s"><rect x="1636.4" y="935" width="7.2" height="99.0" fill="var(--ink)"/><rect x="1615.7" y="809.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="1640" cy="832.4" r="13.5" fill="var(--l1)"/><circle cx="1640" cy="872.0" r="13.5" fill="#3b3a36"/><circle cx="1640" cy="911.6" r="13.5" fill="#3b3a36"/></g></svg>
+</section>
+<section class="slide" style="--sec:var(--l1)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>實測</span><span class="pg"></span></header>
+
+<p class="sign-top reveal">SECTION 03 / 03</p>
+<div class="sign-band reveal" style="--d:.1s"><span class="sign-num">3</span>
+  <div><h2 class="sign-name">實測兩個月</h2><p class="sign-en">FIELD DATA · 152 RUNS</p></div></div>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.25s;stroke-width:10px" d="M400 860 H1520"/><circle class="pop" style="--d:.5s" cx="400" cy="860" r="16" fill="var(--ink)"/><text x="400" y="935" text-anchor="middle" style="font:500 26px var(--cjk);fill:var(--muted)">文件審查</text><circle class="pop" style="--d:.5s" cx="960" cy="860" r="16" fill="var(--ink)"/><text x="960" y="935" text-anchor="middle" style="font:500 26px var(--cjk);fill:var(--muted)">程式碼審查</text><circle class="pop" style="--d:.7s" cx="1520" cy="860" r="34" fill="#fff" stroke="var(--l1)" stroke-width="12"/><text x="1520" y="940" text-anchor="middle" style="font:800 32px var(--cjk);fill:var(--l1)">實測</text><text x="1520" y="800" text-anchor="middle" style="font:700 24px var(--mono);fill:var(--l1)">你在這裡</text></svg>
+</section>
+<section class="slide" style="--sec:var(--l1);--acc:var(--l1)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>實測</span><span class="pg"></span></header>
+<h2 class="title reveal" style="top:150px;font-size:88px">兩個月的實測</h2><p class="abs reveal" style="left:110px;top:265px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.1s;">2026-08-03 到 10-07，作者日常開發的 iOS 與工具專案。</p><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:12px" d="M110 720 H1810"/><circle class="stn pop" style="stroke:var(--l1);stroke-width:9px;--d:0.6s" cx="330" cy="720" r="24"/><circle class="stn pop" style="stroke:var(--l1);stroke-width:9px;--d:0.7s" cx="760" cy="720" r="24"/><circle class="stn pop" style="stroke:var(--l1);stroke-width:9px;--d:0.8s" cx="1190" cy="720" r="24"/><circle class="stn pop" style="stroke:var(--l1);stroke-width:9px;--d:0.9s" cx="1620" cy="720" r="24"/></svg><p class="abs reveal" style="left:100px;top:520px;width:460px;text-align:center;font:900 140px/1 var(--latin);color:var(--l1);--d:0.50s">152</p><div class="abs reveal" style="left:100px;top:775px;width:460px;text-align:center;--d:0.70s"><p style="font:800 34px/1.3 var(--cjk)">個 run</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">排除 12 個測試用</p></div><p class="abs reveal" style="left:530px;top:520px;width:460px;text-align:center;font:900 140px/1 var(--latin);color:var(--l1);--d:0.60s">210</p><div class="abs reveal" style="left:530px;top:775px;width:460px;text-align:center;--d:0.80s"><p style="font:800 34px/1.3 var(--cjk)">輪 Codex 審查</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">plan／review／doc</p></div><p class="abs reveal" style="left:960px;top:520px;width:460px;text-align:center;font:900 140px/1 var(--latin);color:var(--l1);--d:0.70s">567</p><div class="abs reveal" style="left:960px;top:775px;width:460px;text-align:center;--d:0.90s"><p style="font:800 34px/1.3 var(--cjk)">條 findings</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">blocker 90、major 416</p></div><p class="abs reveal" style="left:1390px;top:520px;width:460px;text-align:center;font:900 140px/1 var(--latin);color:var(--l1);--d:0.80s">95%</p><div class="abs reveal" style="left:1390px;top:775px;width:460px;text-align:center;--d:1.00s"><p style="font:800 34px/1.3 var(--cjk)">要求修改</p><p style="font:500 24px/1.5 var(--cjk);color:var(--muted);margin-top:4px">PASS 只出現 4 次</p></div><p class="abs reveal" style="left:110px;top:950px;width:1700px;font:500 28px/1.55 var(--cjk);color:var(--ink2);--d:1.1s;">同一份文件出現過這輪要改、下輪 PASS——<b style="color:var(--ink)">PASS 不等於正確</b>，人工終審不能拿掉。</p>
+</section>
+<section class="slide" style="--sec:var(--l1);--acc:var(--l7)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>實測</span><span class="pg"></span></header>
+
+<p class="kicker reveal" style="top:200px">最划算的審查</p>
+<h2 class="big reveal" style="top:255px;font-size:120px;--d:.1s">90 個 blocker，<br><span class="hl">85 個</span>在寫 code 前抓到。</h2>
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><g class="pop" style="--d:.6s"><rect x="110" y="700" width="1606" height="70" rx="12" fill="var(--l7)"/><rect x="1716" y="700" width="94" height="70" rx="12" fill="var(--l5)"/></g><text x="130" y="748" text-anchor="start" style="font:900 30px var(--cjk);fill:var(--white)">文件階段 85</text><text x="1763" y="820" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l5)">程式碼 5</text></svg>
+<p class="lead reveal" style="top:850px;width:1700px;--d:.4s">舊 plan 模式 23 個＋文件審查 62 個；程式碼審查只多抓到 5 個。<b>能在文件上抓的，就別等到 code。</b></p>
+</section>
+<section class="slide" style="--sec:var(--l1);--acc:var(--l3)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>實測</span><span class="pg"></span></header>
+<p class="kicker reveal" style="top:98px">坑 1</p><h2 class="title reveal" style="top:150px;font-size:76px">規則對，交接的形狀錯了</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:10px" d="M110 560 H1810"/><g class="pop" style="--d:0.5s"><rect x="326.4" y="545" width="7.2" height="99.0" fill="var(--ink)"/><rect x="305.7" y="419.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="330" cy="442.4" r="13.5" fill="var(--l1)"/><circle cx="330" cy="482.0" r="13.5" fill="#3b3a36"/><circle cx="330" cy="521.6" r="13.5" fill="#3b3a36"/></g><g class="pop" style="--d:1.1s"><rect x="1586.4" y="545" width="7.2" height="99.0" fill="var(--ink)"/><rect x="1565.7" y="419.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="1590" cy="442.4" r="13.5" fill="#3b3a36"/><circle cx="1590" cy="482.0" r="13.5" fill="#3b3a36"/><circle cx="1590" cy="521.6" r="13.5" fill="var(--l4)"/></g><g class="pop" style="--d:.8s"><rect x="890" y="520" width="140" height="80" rx="40" fill="#fff" stroke="var(--l3)" stroke-width="9"/></g></svg><div class="abs reveal" style="left:110px;top:640px;width:540px;--d:.5s"><p style="font:800 26px/1.2 var(--mono);color:var(--l1)">改之前</p><p style="font:700 32px/1.45 var(--cjk);margin-top:10px">29 個 iOS 審查卡在「等 preflight」，<b>0 次</b>交成功</p></div><div class="abs reveal" style="left:690px;top:640px;width:540px;--d:.8s"><p style="font:800 26px/1.2 var(--mono);color:var(--l3)">怎麼改</p><p style="font:600 28px/1.5 var(--cjk);color:var(--ink2);margin-top:10px">改成建立 run 時一起交：三個 specialist 各吐一段 JSON，主 session 只負責包起來。</p></div><div class="abs reveal" style="left:1270px;top:640px;width:540px;--d:1.1s"><p style="font:800 26px/1.2 var(--mono);color:var(--l4)">改之後</p><p style="font:700 32px/1.45 var(--cjk);margin-top:10px">之後 10 個審查有 <b>9 個</b>帶著 preflight 開跑</p></div><p class="abs reveal" style="left:110px;top:300px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.3s;">三個 specialist 的報告要在 run 開始後，由人手組成一份七個欄位都不能錯的 JSON 再交；錯了就 exit 2。驗證器沒寫錯，是交接的形狀錯了。</p>
+</section>
+<section class="slide" style="--sec:var(--l1);--acc:var(--l5)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>實測</span><span class="pg"></span></header>
+<p class="kicker reveal" style="top:98px">坑 2</p><h2 class="title reveal" style="top:150px;font-size:76px">閘門被挪動，run 就停死</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:10px" d="M110 560 H1810"/><g class="pop" style="--d:0.5s"><rect x="326.4" y="545" width="7.2" height="99.0" fill="var(--ink)"/><rect x="305.7" y="419.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="330" cy="442.4" r="13.5" fill="var(--l1)"/><circle cx="330" cy="482.0" r="13.5" fill="#3b3a36"/><circle cx="330" cy="521.6" r="13.5" fill="#3b3a36"/></g><g class="pop" style="--d:1.1s"><rect x="1586.4" y="545" width="7.2" height="99.0" fill="var(--ink)"/><rect x="1565.7" y="419.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="1590" cy="442.4" r="13.5" fill="#3b3a36"/><circle cx="1590" cy="482.0" r="13.5" fill="#3b3a36"/><circle cx="1590" cy="521.6" r="13.5" fill="var(--l4)"/></g><g class="pop" style="--d:.8s"><rect x="890" y="520" width="140" height="80" rx="40" fill="#fff" stroke="var(--l5)" stroke-width="9"/></g></svg><div class="abs reveal" style="left:110px;top:640px;width:540px;--d:.5s"><p style="font:800 26px/1.2 var(--mono);color:var(--l1)">改之前</p><p style="font:700 32px/1.45 var(--cjk);margin-top:10px">114 個 run 有 <b>31 個</b>（27%）停在「審查門檻被移動」</p></div><div class="abs reveal" style="left:690px;top:640px;width:540px;--d:.8s"><p style="font:800 26px/1.2 var(--mono);color:var(--l5)">怎麼改</p><p style="font:600 28px/1.5 var(--cjk);color:var(--ink2);margin-top:10px">finding 帶上有型別的來源（已存在／修出來的／新發現），產生時就被 schema 強制。</p></div><div class="abs reveal" style="left:1270px;top:640px;width:540px;--d:1.1s"><p style="font:800 26px/1.2 var(--mono);color:var(--l4)">改之後</p><p style="font:700 32px/1.45 var(--cjk);margin-top:10px">之後 23 個 run，<b>0 次</b></p></div><p class="abs reveal" style="left:110px;top:300px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.3s;">判斷「這是新問題還是修出來的問題」靠比對 finding 的英文字串，而且從沒告訴 Codex 有這個約定。</p>
+</section>
+<section class="slide" style="--sec:var(--l1);--acc:var(--l7)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>實測</span><span class="pg"></span></header>
+<p class="kicker reveal" style="top:98px">坑 3</p><h2 class="title reveal" style="top:150px;font-size:76px">讓 AI 修文件，反而走不到終點</h2><svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.3s;stroke-width:10px" d="M110 560 H1810"/><g class="pop" style="--d:0.5s"><rect x="326.4" y="545" width="7.2" height="99.0" fill="var(--ink)"/><rect x="305.7" y="419.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="330" cy="442.4" r="13.5" fill="var(--l1)"/><circle cx="330" cy="482.0" r="13.5" fill="#3b3a36"/><circle cx="330" cy="521.6" r="13.5" fill="#3b3a36"/></g><g class="pop" style="--d:1.1s"><rect x="1586.4" y="545" width="7.2" height="99.0" fill="var(--ink)"/><rect x="1565.7" y="419.0" width="48.6" height="126.0" rx="12.6" fill="var(--ink)"/><circle cx="1590" cy="442.4" r="13.5" fill="#3b3a36"/><circle cx="1590" cy="482.0" r="13.5" fill="#3b3a36"/><circle cx="1590" cy="521.6" r="13.5" fill="var(--l4)"/></g><g class="pop" style="--d:.8s"><rect x="890" y="520" width="140" height="80" rx="40" fill="#fff" stroke="var(--l7)" stroke-width="9"/></g></svg><div class="abs reveal" style="left:110px;top:640px;width:540px;--d:.5s"><p style="font:800 26px/1.2 var(--mono);color:var(--l1)">改之前</p><p style="font:700 32px/1.45 var(--cjk);margin-top:10px">舊 plan 模式 49 個 run，<b>只有 1 個</b>走到人工審查</p></div><div class="abs reveal" style="left:690px;top:640px;width:540px;--d:.8s"><p style="font:800 26px/1.2 var(--mono);color:var(--l7)">怎麼改</p><p style="font:600 28px/1.5 var(--cjk);color:var(--ink2);margin-top:10px">拿掉自動修復：Codex 只讀審查，人取捨後，Claude 才改被採納的那幾條。</p></div><div class="abs reveal" style="left:1270px;top:640px;width:540px;--d:1.1s"><p style="font:800 26px/1.2 var(--mono);color:var(--l4)">改之後</p><p style="font:700 32px/1.45 var(--cjk);margin-top:10px">文件審查 15 個 run，<b>10 個</b>走到人工審查</p></div><p class="abs reveal" style="left:110px;top:300px;width:1700px;font:500 30px/1.55 var(--cjk);color:var(--ink2);--d:0.3s;">審完由 Claude 自動修文件、再審：外部呼叫失敗和「門檻被移動」大多卡在修復這一側。</p>
+</section>
+<section class="slide" style="--sec:var(--ink);--acc:var(--l2)">
+<header class="hdr"><span>AI-REVIEW · 號誌與閘門</span><span class="sec"><i></i>開場</span><span class="pg"></span></header>
+
+<svg class="map" viewBox="0 0 1920 1080" aria-hidden="true"><path class="ln" pathLength="1" style="stroke:var(--ink);--d:0.2s;stroke-width:12px" d="M-20 1000 H1940"/><g class="pop" style="--d:0.5s"><rect x="297.2" y="990" width="5.6" height="77.0" fill="var(--ink)"/><rect x="281.1" y="892.0" width="37.8" height="98.0" rx="9.799999999999999" fill="var(--ink)"/><circle cx="300" cy="910.2" r="10.5" fill="#3b3a36"/><circle cx="300" cy="941.0" r="10.5" fill="#3b3a36"/><circle cx="300" cy="971.8000000000001" r="10.5" fill="var(--l4)"/></g><g class="pop" style="--d:0.6s"><rect x="897.2" y="990" width="5.6" height="77.0" fill="var(--ink)"/><rect x="881.1" y="892.0" width="37.8" height="98.0" rx="9.799999999999999" fill="var(--ink)"/><circle cx="900" cy="910.2" r="10.5" fill="#3b3a36"/><circle cx="900" cy="941.0" r="10.5" fill="#3b3a36"/><circle cx="900" cy="971.8000000000001" r="10.5" fill="var(--l4)"/></g><g class="pop" style="--d:0.7s"><rect x="1486" y="952.0" width="28" height="96" rx="8" fill="#fff" stroke="var(--l2)" stroke-width="7"/><rect x="1491" y="960.0" width="18" height="12" fill="var(--l2)"/><rect x="1491" y="994.0" width="18" height="12" fill="var(--l2)"/><rect x="1491" y="1028.0" width="18" height="12" fill="var(--l2)"/></g><text x="1500" y="934.0" text-anchor="middle" style="font:900 26px var(--cjk);fill:var(--l2)"></text><text x="1500" y="1084.0" text-anchor="middle" style="font:700 22px var(--mono);fill:var(--muted)"></text></svg>
+<h2 class="big reveal" style="top:180px;font-size:150px;--d:.1s">AI 互相檢查，<br><span class="amber">人類</span>最後放行。</h2>
+<div class="term-card reveal" style="left:110px;top:560px;width:1180px;--d:.3s">
+  <p class="c" style="font-size:20px;margin-bottom:10px"># 安裝</p>
+  <p class="cmdline">git clone https://github.com/peter6601/ai-review.git<br>cd ai-review &amp;&amp; python3 install_skills.py --apply</p>
+  <p class="c" style="font-size:20px;margin:16px 0 10px"># 在 Claude Code 或 Codex 裡說</p>
+  <p class="cmdline">使用 consensus-plan 審查 docs/spec.md</p></div>
+<div class="abs reveal" style="left:1380px;top:180px;width:430px;height:500px;background:#fff;border:5px solid var(--ink);border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;--d:.35s">
+  <div style="width:320px;height:320px"><svg style="width:320px;height:320px;max-width:none;max-height:none" viewBox="0 0 290 290" class="segno"><path transform="scale(10)" class="qrline" stroke="#1b1b1b" d="M0 0.5h7m2 0h1m2 0h1m1 0h2m2 0h2m2 0h7m-29 1h1m5 0h1m2 0h1m1 0h2m1 0h2m1 0h2m3 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m3 0h2m2 0h1m1 0h2m2 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m2 0h1m1 0h1m3 0h3m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m5 0h2m1 0h2m5 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m1 0h2m5 0h1m1 0h1m1 0h1m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-20 1h1m1 0h1m2 0h1m2 0h1m2 0h1m-21 1h1m2 0h1m1 0h2m1 0h3m7 0h1m2 0h1m1 0h1m-24 1h1m4 0h1m2 0h2m1 0h1m1 0h1m2 0h3m1 0h1m1 0h1m2 0h1m2 0h1m-27 1h2m1 0h2m2 0h1m2 0h3m1 0h2m1 0h3m2 0h4m-27 1h1m1 0h1m1 0h1m1 0h1m1 0h1m3 0h4m2 0h2m3 0h1m1 0h2m-24 1h1m1 0h2m2 0h2m2 0h1m1 0h3m2 0h2m2 0h1m1 0h2m-29 1h4m5 0h1m3 0h1m3 0h5m-22 1h1m1 0h6m1 0h6m1 0h1m3 0h1m1 0h7m-27 1h2m1 0h1m2 0h2m1 0h1m5 0h1m2 0h3m2 0h1m1 0h1m-28 1h1m1 0h2m2 0h1m2 0h2m2 0h1m2 0h3m1 0h1m2 0h1m3 0h1m-27 1h1m1 0h1m4 0h3m1 0h3m1 0h1m1 0h1m1 0h4m1 0h1m2 0h1m-29 1h1m5 0h1m1 0h2m1 0h2m1 0h1m3 0h1m2 0h1m1 0h2m2 0h2m-27 1h1m1 0h2m1 0h2m1 0h2m2 0h2m1 0h1m2 0h2m1 0h2m2 0h2m-29 1h1m4 0h3m1 0h1m5 0h2m1 0h7m1 0h1m-19 1h1m3 0h1m1 0h1m2 0h4m3 0h1m1 0h3m-29 1h7m3 0h3m3 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m-28 1h1m5 0h1m1 0h2m2 0h1m1 0h2m2 0h1m1 0h1m3 0h5m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h1m3 0h4m1 0h5m2 0h2m-29 1h1m1 0h3m1 0h1m1 0h3m1 0h1m6 0h2m1 0h6m-28 1h1m1 0h3m1 0h1m3 0h2m2 0h1m4 0h2m3 0h3m1 0h1m-29 1h1m5 0h1m2 0h1m1 0h1m3 0h1m1 0h5m2 0h1m2 0h1m-28 1h7m1 0h2m4 0h1m2 0h1m2 0h6m1 0h1"/></svg></div>
+  <p style="font:700 18px/1 var(--mono);color:var(--muted)">github.com/peter6601/ai-review</p></div>
+<p class="abs reveal" style="left:1380px;top:720px;width:430px;text-align:center;font:600 24px/1.5 var(--cjk);color:var(--muted);--d:.5s">系列：<a href="../" style="color:var(--l3)">ios-dev 路網圖</a>・<a href="../vibe/" style="color:var(--l4)">vibe 直達車</a></p>
+</section>
+</main>
+<div class="progress" id="progress"></div>
+</div>
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   方向鍵／空白鍵／PageUp-Down／滑鼠滾輪／觸控滑動；網址 #頁碼 可直接跳頁
+   =========================================== */
+class SlidePresentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll('.slide')];
+    this.stage = document.getElementById('deckStage');
+    this.bar = document.getElementById('progress');
+    this.current = 0;
+    this.slides.forEach((s, i) => {
+      const pg = s.querySelector('.pg');
+      if (pg) pg.textContent = String(i + 1).padStart(2, '0') + ' / ' + String(this.slides.length).padStart(2, '0');
+    });
+    this.fit(); addEventListener('resize', () => this.fit());
+    this.keys(); this.wheel(); this.touch();
+    const h = parseInt(location.hash.slice(1), 10);
+    this.show(Number.isFinite(h) ? h - 1 : 0, true);
+    addEventListener('hashchange', () => { const n = parseInt(location.hash.slice(1), 10); if (Number.isFinite(n) && n - 1 !== this.current) this.show(n - 1); });
+  }
+  fit() {
+    const f = Math.min(innerWidth / 1920, innerHeight / 1080);
+    this.stage.style.transform = `translate(${(innerWidth - 1920 * f) / 2}px, ${(innerHeight - 1080 * f) / 2}px) scale(${f})`;
+  }
+  editing() { const a = document.activeElement; return a && a.isContentEditable; }
+  keys() {
+    addEventListener('keydown', e => {
+      if (this.editing()) return;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); this.show(this.current + 1); }
+      if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); this.show(this.current - 1); }
+      if (e.key === 'Home') this.show(0);
+      if (e.key === 'End') this.show(this.slides.length - 1);
+    });
+  }
+  wheel() {
+    let lock = false;
+    addEventListener('wheel', e => {
+      if (this.editing() || lock || Math.abs(e.deltaY) < 20) return;
+      lock = true; setTimeout(() => lock = false, 700);
+      this.show(this.current + (e.deltaY > 0 ? 1 : -1));
+    }, { passive: true });
+  }
+  touch() {
+    let x0 = null, y0 = null;
+    addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    addEventListener('touchend', e => {
+      if (x0 === null || this.editing()) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) this.show(this.current + (dx < 0 ? 1 : -1));
+      x0 = null;
+    }, { passive: true });
+  }
+  show(i, first) {
+    i = Math.max(0, Math.min(i, this.slides.length - 1));
+    if (i === this.current && !first) return;
+    this.slides.forEach((s, k) => { s.classList.toggle('active', k === i); if (k !== i) s.classList.remove('visible'); });
+    const s = this.slides[i];
+    requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('visible')));
+    this.current = i;
+    this.bar.style.width = ((i + 1) / this.slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+}
+
+/* ===========================================
+   INLINE EDITOR — E 鍵或左上角開關；Ctrl/Cmd+S 下載改好的檔案
+   修改會暫存在這台瀏覽器（localStorage），換台電腦不會帶過去
+   =========================================== */
+class InlineEditor {
+  constructor() {
+    this.isActive = false;
+    this.dirty = false;
+    this.btn = document.getElementById('editToggle');
+    this.toastEl = document.getElementById('toast');
+    this.targets = [...document.querySelectorAll('.slide *')].filter(el =>
+      !el.closest('svg') && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) );
+    /* 暫存的 key 綁定原始內容的雜湊：檔案本身改版後，舊的瀏覽器暫存自動失效，不會蓋掉新內容 */
+    let h = 0; const src = this.targets.map(t => t.innerHTML).join('\u0001');
+    for (let i = 0; i < src.length; i++) h = (h * 31 + src.charCodeAt(i)) | 0;
+    this.key = 'aireview-signal-deck:' + (h >>> 0).toString(36);
+    this.restore();
+    this.bind();
+  }
+  restore() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(this.key) || 'null');
+      if (saved && saved.length === this.targets.length) saved.forEach((h, i) => { if (h !== null) this.targets[i].innerHTML = h; });
+    } catch (e) {}
+  }
+  save() {
+    try { localStorage.setItem(this.key, JSON.stringify(this.targets.map(t => t.innerHTML))); } catch (e) {}
+  }
+  toggle() {
+    this.isActive = !this.isActive;
+    document.body.classList.toggle('editing', this.isActive);
+    this.btn.classList.toggle('active', this.isActive);
+    this.btn.textContent = this.isActive ? '完成編輯 (E)' : '編輯 (E)';
+    this.targets.forEach(t => t.contentEditable = this.isActive ? 'true' : 'false');
+    if (!this.isActive) { if (this.dirty) { this.save(); this.toast('已暫存在這台瀏覽器'); } document.activeElement && document.activeElement.blur(); }
+  }
+  toast(msg) { this.toastEl.textContent = msg; this.toastEl.classList.add('show'); setTimeout(() => this.toastEl.classList.remove('show'), 1600); }
+  download() {
+    this.save();
+    const doc = document.documentElement.cloneNode(true);
+    doc.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+    doc.querySelector('body').classList.remove('editing');
+    doc.querySelectorAll('.slide').forEach(s => s.classList.remove('active', 'visible'));
+    const blob = new Blob(['<!DOCTYPE html>\n' + doc.outerHTML], { type: 'text/html' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ai-review-號誌與閘門.html'; a.click();
+    this.toast('已下載修改後的 HTML');
+  }
+  bind() {
+    const hot = document.querySelector('.edit-hotzone'); let t = null;
+    const show = () => { clearTimeout(t); this.btn.classList.add('show'); };
+    const hide = () => { t = setTimeout(() => { if (!this.isActive) this.btn.classList.remove('show'); }, 400); };
+    hot.addEventListener('mouseenter', show); hot.addEventListener('mouseleave', hide);
+    this.btn.addEventListener('mouseenter', show); this.btn.addEventListener('mouseleave', hide);
+    hot.addEventListener('click', () => this.toggle()); this.btn.addEventListener('click', () => this.toggle());
+    addEventListener('keydown', e => {
+      if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey && !(document.activeElement && document.activeElement.isContentEditable)) this.toggle();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); this.download(); }
+    });
+    document.addEventListener('input', () => { this.dirty = true; this.save(); });
+  }
+}
+
+window.deck = new SlidePresentation();
+window.editor = new InlineEditor();
+</script>
+</body>
+</html>
